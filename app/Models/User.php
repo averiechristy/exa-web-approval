@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -15,13 +16,22 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
      */
+    protected $fillable = [
+        'system_role_id',
+        'name',
+        'email',
+        'username',
+        'manager_id',
+        'is_active',
+        'password'
+    ];
     protected function casts(): array
     {
         return [
@@ -29,4 +39,15 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function useraccess()
+    {
+        return $this->hasMany(UserAccess::class);
+    }
+
+    public function documentapproval()
+    {
+        return $this->hasMany(DocumentApproval::class);
+    }
+
 }

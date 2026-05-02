@@ -34,30 +34,40 @@
                     <div class="text-center mb-4">
                         <h1 class="h3 text-gray-900">Login</h1>
                     </div>
+                                            {{-- ERROR MESSAGE --}}
+                        @if ($errors->any())
+                            <div class="alert alert-danger">
+                                {{ $errors->first() }}
+                            </div>
+                        @endif
 
-                    <form class="user">
+                    <form method="POST" action="{{ route('login.post') }}">
+                        @csrf
+
                         <div class="form-group mb-4">
                             <input
                                 type="text"
+                                name="username"
                                 class="form-control form-control-user"
-                                id="username"
+                                value="{{ old('username') }}"
                                 placeholder="Username"
+                                required
                             >
                         </div>
 
                         <div class="form-group mb-4">
                             <input
                                 type="password"
+                                name="password"
                                 class="form-control form-control-user"
-                                id="password"
                                 placeholder="Password"
+                                required
                             >
                         </div>
 
-                        <a href="dashboard.html" class="btn btn-primary btn-user btn-block">
+                        <button type="submit" class="btn btn-primary btn-user btn-block">
                             Login
-                        </a>
-
+                        </button>
                     </form>
 
                 </div>

@@ -17,6 +17,10 @@ class Documents extends Model
         'document_name',
         'path',
         'status',
+        'requester_id',
+        'requester_division_id',
+        'workflow_id',
+        'current_tier'
     ];
 
     public function organization()

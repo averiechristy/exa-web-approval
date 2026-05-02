@@ -16,6 +16,7 @@ class WorkflowStep extends Model
         'tier',
         'division_id',
         'sla_days',
+        'min_role_level'
     ];
 
     public function workflow()
@@ -26,5 +27,10 @@ class WorkflowStep extends Model
     public function division()
     {
         return $this->belongsTo(Division::class, 'division_id');
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class, 'min_role_level', 'role_level');
     }
 }

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('folders', function (Blueprint $table) {
             $table->id();
             $table->bigInteger('organization_id')->constrained('organizations');
-            $table->bigInteger('parent_id');
+            $table->unsignedBigInteger('parent_id')->nullable();
             $table->string('folder_name',50);
             $table->baseColumns();
             $table->timestamps();

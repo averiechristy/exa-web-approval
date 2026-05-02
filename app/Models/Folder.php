@@ -26,4 +26,15 @@ class Folder extends Model
     {
         return $this->hasMany(Documents::class);
     }
+
+    public function parent()
+    {
+        return $this->belongsTo(Folder::class, 'parent_id');
+    }
+
+   public function children()
+    {
+        return $this->hasMany(Folder::class, 'parent_id')
+                    ->with('children'); // recursive
+    }
 }

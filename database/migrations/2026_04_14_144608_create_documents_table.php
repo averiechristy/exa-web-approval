@@ -18,6 +18,10 @@ return new class extends Migration
             $table->string('document_name', 50);
             $table->string('path', 255);
             $table->string('status', 50);
+            $table->bigInteger('requester_id')->constrained('users');
+            $table->bigInteger('requester_division_id')->constrained('divisions');
+            $table->bigInteger('workflow_id')->constrained('workflows');
+            $table->integer('current_tier');
             $table->baseColumns();
             $table->timestamps();
         });

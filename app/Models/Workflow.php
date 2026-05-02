@@ -21,7 +21,13 @@ class Workflow extends Model
         return $this->belongsTo(Organization::class, 'organization_id');
     }
 
+    
     public function workflowstep()
+    {
+        return $this->hasMany(WorkflowStep::class);
+    }
+
+    public function steps()
     {
         return $this->hasMany(WorkflowStep::class);
     }

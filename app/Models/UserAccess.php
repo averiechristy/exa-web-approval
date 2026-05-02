@@ -16,6 +16,7 @@ class UserAccess extends Model
         'organization_id',
         'division_id',
         'role_id',
+        'manager_id',
     ];
 
     public function user()
@@ -33,5 +34,9 @@ class UserAccess extends Model
     public function role()
     {
         return $this->belongsTo(Role::class, 'role_id');
+    }
+      public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
     }
 }

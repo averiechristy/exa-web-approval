@@ -19,8 +19,14 @@ return new class extends Migration
             $table->integer('approver_order');
             $table->boolean('show_on_doc');
             $table->string('status', 20);
-            $table->dateTime('approved_at');
             $table->text('remarks');
+            $table->integer('sla_days');
+            $table->dateTime('started_at');
+            $table->dateTime('due_at');
+            $table->dateTime('completed_at');
+            $table->boolean('is_overdue');
+            $table->integer('tier');
+            $table->bigInteger('workflow_step_id')->constrained('workflow_steps');
             $table->baseColumns();
             $table->timestamps();
         });

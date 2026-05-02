@@ -17,6 +17,7 @@ return new class extends Migration
             $table->bigInteger('organization_id')->constrained('organizations');
             $table->bigInteger('division_id')->constrained('divisions');
             $table->bigInteger('role_id')->constrained('roles');
+            $table->bigInteger('manager_id')->constrained('users')->nullable();
             $table->baseColumns();
             $table->timestamps();
         });

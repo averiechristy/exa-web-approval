@@ -12,7 +12,7 @@ class Role extends Model
     use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'order',
+        'role_level',
         'role_name'
     ];
 

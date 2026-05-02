@@ -17,6 +17,7 @@ return new class extends Migration
             $table->integer('tier');
             $table->bigInteger('division_id')->constrained('divisions');
             $table->integer('sla_days');
+            $table->integer('min_role_level');
             $table->baseColumns();
             $table->timestamps();
         });

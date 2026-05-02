@@ -15,11 +15,10 @@ return new class extends Migration
             $table->id();
             $table->bigInteger('system_role_id')->constrained('system_roles');;
             $table->string('name', 50);
-            $table->string('email', 50)->unique();
+            $table->string('email', 50);
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('username',50);
-            $table->bigInteger('manager_id')->nullable();
             $table->boolean('is_active');
             $table->rememberToken();
             $table->timestamps();

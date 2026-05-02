@@ -28,7 +28,6 @@ class User extends Authenticatable
         'name',
         'email',
         'username',
-        'manager_id',
         'is_active',
         'password'
     ];
@@ -40,7 +39,7 @@ class User extends Authenticatable
         ];
     }
 
-    public function useraccess()
+    public function userAccesses()
     {
         return $this->hasMany(UserAccess::class);
     }
@@ -48,6 +47,21 @@ class User extends Authenticatable
     public function documentapproval()
     {
         return $this->hasMany(DocumentApproval::class);
+    }
+
+    public function systemRole()
+    {
+        return $this->belongsTo(SystemRole::class);
+    }
+
+    public function isSuperadmin()
+    {
+        return optional($this->systemRole)->id === 1;
+    }
+    
+    public function access()
+    {
+        return $this->hasOne(UserAccess::class);
     }
 
 }

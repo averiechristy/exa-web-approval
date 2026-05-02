@@ -20,6 +20,13 @@ class DocumentApproval extends Model
         'status',
         'approved_at',
         'remarks',
+        'sla_days',
+        'started_at',
+        'due_at',
+        'completed_at',
+        'is_overdue',
+        'tier',
+        'workflow_step_id'
     ];
 
     public function document()

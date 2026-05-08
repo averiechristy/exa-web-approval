@@ -6,7 +6,9 @@ use App\Models\Division;
 use App\Models\Folder;
 use App\Models\Organization;
 use App\Models\User;
+use App\Models\UserAccess;
 use App\Models\Workflow;
+use App\Models\WorkflowStep;
 use Illuminate\Http\Request;
 
 class UploadController extends Controller
@@ -105,77 +107,6 @@ class UploadController extends Controller
         return response()->json($documentTypes);
     }
 
-    public function getApprovers(Request $request)
-    {
-        $organizationId = $request->get('organization_id');
-        $divisionId = $request->get('division_id'); 
-        $documentTypeId = $request->get('document_type_id');
-        
-        $currentUser = auth()->user();
-        $minRoleLevel = 1; // Default untuk superadmin
-        
-        // Cek role active dari session atau current user
-        if ($currentUser && $currentUser->active_role_id) {
-            $activeRole = \App\Models\Role::find($currentUser->active_role_id);
-            $minRoleLevel = $activeRole ? $activeRole->role_level : 1;
-        }
-        
-        // Ambil semua division_id yang relevan berdasarkan workflow tiers
-        $relevantDivisionIds = collect();
-        
-        if ($organizationId && $documentTypeId) {
-            // Ambil workflow steps untuk document type ini
-            $workflowSteps = \App\Models\WorkflowStep::select('division_id', 'tier', 'min_role_level')
-                ->join('workflows', 'workflow_steps.workflow_id', '=', 'workflows.id')
-                ->where('workflows.organization_id', $organizationId)
-                ->where('workflows.id', $documentTypeId)
-                ->orderBy('tier')
-                ->get();
-            
-            // Kumpulkan division_id yang min_role_levelnya >= current user role level
-            foreach ($workflowSteps as $step) {
-                if ($step->min_role_level >= $minRoleLevel) {
-                    $relevantDivisionIds->push($step->division_id);
-                }
-            }
-            
-            // Tambahkan division_id saat ini jika belum ada
-            if (!$relevantDivisionIds->contains($divisionId)) {
-                $relevantDivisionIds->push($divisionId);
-            }
-        } else {
-            // Fallback ke division_id saat ini saja
-            $relevantDivisionIds->push($divisionId);
-        }
-        
-        $users = User::select(
-                'users.id', 
-                'users.name', 
-                'users.email', 
-                'user_accesses.organization_id', 
-                'user_accesses.division_id',
-                'roles.role_name as role_name',
-                'roles.role_level'
-            )
-            ->join('user_accesses', 'users.id', '=', 'user_accesses.user_id')
-            ->join('roles', 'user_accesses.role_id', '=', 'roles.id')
-            ->whereIn('user_accesses.division_id', $relevantDivisionIds)
-            ->where('roles.role_level', '>', $minRoleLevel) // Hanya user dengan role_level lebih tinggi dari current user
-            ->when($organizationId, function($q) use ($organizationId) {
-                return $q->where('user_accesses.organization_id', $organizationId);
-            })
-            ->distinct()
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'users' => $users,
-            'current_role_level' => $minRoleLevel,
-            'relevant_divisions' => $relevantDivisionIds, // Optional: untuk debug
-            'workflow_steps_found' => $workflowSteps ?? collect() // Optional: untuk debug
-        ]);
-    }
-
     public function getCC(Request $request)
     {
         $organizationId = $request->get('organization_id');
@@ -194,6 +125,91 @@ class UploadController extends Controller
         return response()->json([
             'success' => true,
             'users' => $users
+        ]);
+    }
+
+    public function getWorkflowApprovers($workflowId, Request $request)
+    {
+        $orgId = $request->organization_id;
+        $requesterDivisionId = $request->division_id;   // division requester
+        $currentUser = auth()->user();
+
+        // Ambil workflow steps
+        $workflowSteps = WorkflowStep::with('division')
+            ->where('workflow_id', $workflowId)
+            ->orderBy('tier')
+            ->get();
+
+        $result = [];
+
+        // ================== GROUP 1: Same Division - Higher Role ==================
+        $sameDivisionUsers = UserAccess::with(['user', 'role'])
+            ->where('organization_id', $orgId)
+            ->where('division_id', $requesterDivisionId)
+            ->where('user_id', '!=', $currentUser->id)
+            ->whereHas('role', function($q) use ($currentUser) {
+                // Role lebih tinggi dari user saat ini
+                $q->where('role_level', '>', $currentUser->active_role_level ?? 1);
+            })
+            ->get()
+            ->map(function($access) {
+                return [
+                    'id'         => $access->user->id,
+                    'name'       => $access->user->name,
+                    'role_name'  => $access->role->role_name ?? '',
+                    'role_level' => $access->role->role_level,
+                    'source'     => 'same_division'
+                ];
+            });
+
+        // Masukkan sebagai Tier 0 atau "Direct Superior"
+        if ($sameDivisionUsers->isNotEmpty()) {
+            $division = Division::find($requesterDivisionId);
+            $result[] = [
+                'tier'          => 0,
+                'title'         => "Tier 0",
+                'division_name' => $division->division_name ?? 'Unknown',
+                'division_id'   => $division?->id ?? '',
+                'sla_days'      => 0,
+                'users'         => $sameDivisionUsers,
+                'is_same_division' => true
+            ];
+        }
+
+        // ================== GROUP 2: Workflow Tiers ==================
+        foreach ($workflowSteps as $step) {
+            $users = UserAccess::with(['user', 'role'])
+                ->where('organization_id', $orgId)
+                ->where('division_id', $step->division_id)
+                ->where('user_id', '!=', $currentUser->id)
+                ->whereHas('role', function($q) use ($step) {
+                    $q->where('role_level', '>=', $step->min_role_level);
+                })
+                ->get()
+                ->map(function($access) {
+                    return [
+                        'id'         => $access->user->id,
+                        'name'       => $access->user->name,
+                        'role_name'  => $access->role->role_name ?? '',
+                        'role_level' => $access->role->role_level,
+                        'source'     => 'workflow'
+                    ];
+                });
+
+            $result[] = [
+                'tier'          => $step->tier,
+                'title'         => "Tier {$step->tier}",
+                'division_name' => $step->division?->division_name ?? 'Unknown',
+                'division_id'   => $step->division?->id ?? '',
+                'sla_days'      => $step->sla_days,
+                'users'         => $users,
+                'is_same_division' => false
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'workflow_steps' => $result
         ]);
     }
     /**

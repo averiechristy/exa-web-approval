@@ -50,7 +50,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/folders/by-organization/{orgId}', [UploadController::class, 'getByOrganization']);
     Route::get('/workflows/by-organization/{orgId}', [UploadController::class, 'getDocumentTypesByOrganization']);
 
-    Route::get('/users/approvers', [UploadController::class, 'getApprovers'])->name('users.approvers');
     Route::get('/users/carboncopy', [UploadController::class, 'getCC'])->name('users.carboncopy');
+
+    Route::get('/api/workflow-approvers/{workflow_id}', [UploadController::class, 'getWorkflowApprovers']);
     
 });

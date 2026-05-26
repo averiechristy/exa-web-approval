@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\FolderController;
+use App\Http\Controllers\InboxController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UploadController;
@@ -53,5 +54,28 @@ Route::middleware('auth')->group(function () {
     Route::get('/users/carboncopy', [UploadController::class, 'getCC'])->name('users.carboncopy');
 
     Route::get('/api/workflow-approvers/{workflow_id}', [UploadController::class, 'getWorkflowApprovers']);
+    Route::post('/documents/store', [UploadController::class, 'store'])->name('documents.store');
     
+// Inbox
+Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
+
+// Folder Document
+Route::get('documents/folder/{folder}', [InboxController::class, 'showFolder'])
+     ->name('documents.folder');     
+
+
+     // ===== ROUTES UNTUK DOCUMENT =====
+
+Route::prefix('documents')->name('documents.')->group(function () {
+
+    Route::get('/{document}/view', [DocumentController::class, 'view'])
+         ->name('view');
+
+    Route::get('/{document}/download', [DocumentController::class, 'download'])
+         ->name('download');
+
+    // Optional: Share, Move, Void, dll
+    Route::post('/{document}/share', [DocumentController::class, 'share'])->name('share');
 });
+});
+

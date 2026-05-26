@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\DocumentApprovalMail;
+use App\Models\ApprovalPosition;
 use App\Models\Division;
+use App\Models\DocumentApproval;
+use App\Models\Documents;
+use App\Models\DocumentShare;
 use App\Models\Folder;
 use App\Models\Organization;
 use App\Models\User;
@@ -10,6 +15,8 @@ use App\Models\UserAccess;
 use App\Models\Workflow;
 use App\Models\WorkflowStep;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class UploadController extends Controller
 {
@@ -225,9 +232,122 @@ class UploadController extends Controller
      */
     public function store(Request $request)
     {
-        //
-    }
+        try {
+            $payloadJson = $request->input('payload');
+            $payload = json_decode($payloadJson, true);
 
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return response()->json(['message' => 'Payload JSON invalid'], 422);
+            }
+
+            $uploadedFiles = $request->file('files');
+
+            if (empty($uploadedFiles)) {
+                return response()->json(['message' => 'No files uploaded'], 422);
+            }
+
+            $folderName = 'documents/' . date('Y/m/d');
+            $createdDocuments = [];
+
+            foreach ($uploadedFiles as $index => $file) {
+                $meta = $payload['files'][$index] ?? [];
+
+                $filename = time() . '_' . $index . '_' . 
+                            Str::slug(pathinfo($meta['name'] ?? 'document', PATHINFO_FILENAME)) . 
+                            '.' . $file->getClientOriginalExtension();
+
+                $path = $file->storeAs($folderName, $filename, 'public');
+
+                // Create Document
+                $document = Documents::create([
+                    'organization_id'       => $payload['document']['organization_id'],
+                    'folder_id'             => $payload['document']['folder_id'],
+                    'document_name'         => $meta['name'] ?? 'Untitled',
+                    'path'                  => $path,
+                    'status'                => 'DRAFT',
+                    'requester_id'          => auth()->id(),
+                    'requester_division_id' => $payload['document']['requester_division_id'] ?? null,
+                    'workflow_id'           => $payload['document']['workflow_id'],   // ← Ini penyebab error
+                    'current_tier'          => 0,
+                    'placement_type'        => $payload['placement_type'] ?? 'custom',
+                    'email_subject'        => $payload['email_subject'] ?? null,
+                    'email_message'       => $payload['email_message'] ?? null,
+                ]);
+
+                $createdDocuments[] = $document;
+
+                // Create Approvals
+                $approvalIdsMap = []; // temp_id => real id
+
+                foreach ($payload['document_approvals'] as $app) {
+                    $slaDays = (int) ($approval['sla_days'] ?? 1); 
+                    $docApproval = DocumentApproval::create([
+                        'document_id'    => $document->id,
+                        'division_id'    => $app['division_id'],
+                        'approver_id'    => $app['approver_id'],
+                        'approver_order' => $app['approver_order'],
+                        'show_on_doc'    => $app['show_on_doc'],
+                        'status'         => $app['status'],
+                        'tier'           => $app['tier'],
+                        'remarks'           => 'tes',
+                        'sla_days'          => $slaDays,
+                        'workflow_step_id'  => $app['workflow_step_id'] ?? null,
+                        'started_at'        => now(),
+                        'due_at'            => now()->addDays($slaDays),
+                        'completed_at'      => now(),
+                        'is_overdue'        => false,
+                    ]);
+
+                    $approvalIdsMap[$app['temp_id']] = $docApproval->id;
+                }
+
+                // Create Positions for this file only
+                $filePositions = $payload['file_positions'][$index]['signatures'] ?? [];
+
+                foreach ($filePositions as $pos) {
+                    if (isset($approvalIdsMap[$pos['approver_temp_id']])) {
+                        ApprovalPosition::create([
+                            'document_approval_id' => $approvalIdsMap[$pos['approver_temp_id']],
+                            'page_number'          => $pos['page_number'],
+                            'pos_x_percent'        => $pos['pos_x_percent'],
+                            'pos_y_percent'        => $pos['pos_y_percent'],
+                        ]);
+                    }
+                }
+
+                // Create CC Shares
+                foreach ($payload['document_shares'] as $share) {
+                    DocumentShare::create([
+                        'document_id' => $document->id,
+                        'share_to'    => $share['share_to'],
+                        'share_by'    => auth()->id(),
+                    ]);
+                }
+                if ($app['approver_order'] == 1) {
+
+                    $approverUser = User::find($app['approver_id']);
+
+                    if ($approverUser && $approverUser->email) {
+                        Mail::to($approverUser->email)->send(
+                            new DocumentApprovalMail($document, $docApproval)
+                        );
+                    }
+                 }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => count($createdDocuments) . ' documents were successfully created',
+                'document_ids' => collect($createdDocuments)->pluck('id')
+            ], 201);
+
+        } catch (\Exception $e) {
+            \Log::error('Document Store Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine());
+            return response()->json([
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
     /**
      * Display the specified resource.
      */

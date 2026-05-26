@@ -20,7 +20,9 @@ class Documents extends Model
         'requester_id',
         'requester_division_id',
         'workflow_id',
-        'current_tier'
+        'current_tier',
+        'email_subject',
+        'email_message'
     ];
 
     public function organization()
@@ -33,13 +35,38 @@ class Documents extends Model
         return $this->belongsTo(Folder::class, 'folder_id');
     }
 
-    public function documentapproval()
+    public function documentApprovals()
     {
-        return $this->hasMany(DocumentApproval::class);
+        return $this->hasMany(DocumentApproval::class, 'document_id', 'id');
     }
-
     public function documentshare()
     {
         return $this->hasMany(DocumentShare::class);
+    }
+
+    public function requester()
+    {
+        return $this->belongsTo(User::class, 'requester_id');
+    }
+
+    public function getCurrentApprovers()
+    {
+        $currentTier = $this->documentapprovals()
+                            ->where('status', 'pending')
+                            ->min('tier');
+
+        return $this->documentapprovals()
+                    ->where('tier', $currentTier)
+                    ->orderBy('order')
+                    ->get();
+    }
+
+    public function isNextApprover($user)
+    {
+        $currentApprovers = $this->getCurrentApprovers();
+        if ($currentApprovers->isEmpty()) return false;
+
+        $firstPending = $currentApprovers->first();
+        return $firstPending->approver_id === $user->id;
     }
 }

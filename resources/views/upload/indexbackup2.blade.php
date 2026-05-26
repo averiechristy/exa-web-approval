@@ -30,7 +30,7 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-start mb-4">
                 <div>
-                    <h5 class="mb-1 text-primary">Upload Document</h5>
+                    <h5 class="mb-1 text-primary">Upload Dokumen</h5>
                     <p class="text-muted small mb-0">Upload the PDF document to be processed</p>
                 </div>
                 <div class="text-end">
@@ -49,7 +49,7 @@
                     <i class="fas fa-folder-open"></i> Choose File
                 </button>
                 <p class="text-muted mt-3 mb-0" style="font-size: 13px;">
-                    Max 5 files • Max 25 MB per file • PDF only
+                     Max 50 MB • PDF only
                 </p>
             </div>
 
@@ -166,70 +166,82 @@
         </div>
     </div>
     <!-- STEP 3 -->
-<!-- STEP 3 -->
-<div class="card shadow mb-4 step-content">
-    <div class="card-body">
+    <div class="card shadow mb-4 step-content">
+        <div class="card-body">
 
-        <!-- Signature Placement Type -->
-        <div class="mb-4">
-            <h6 class="font-weight-bold text-primary mb-3">Signature Placement Type</h6>
-            <div class="btn-group btn-group-toggle w-100" data-toggle="buttons">
-                <label class="btn btn-outline-primary active">
-                    <input type="radio" name="placementType" value="custom" checked>
-                    Custom <small class="d-block">Drag & drop manually</small>
-                </label>
-                <label class="btn btn-outline-primary">
-                    <input type="radio" name="placementType" value="standard">
-                    Standard <small class="d-block">Auto bottom right</small>
-                </label>
-                <label class="btn btn-outline-primary">
-                    <input type="radio" name="placementType" value="fixed">
-                    Fixed <small class="d-block">Approval summary page</small>
-                </label>
-            </div>
-        </div>
+            <!-- ================= PLACEMENT TYPE ================= -->
+            <div class="mb-4">
 
-        <div class="row">
-            <!-- SIGNER PANEL (Lebih Kecil) -->
-            <div class="col-md-2">
                 <h6 class="font-weight-bold text-primary mb-3">
-                    <i class="fas fa-user-check mr-2"></i> Approvers (Show on Doc)
+                    Signature Placement Type
                 </h6>
-                <div class="list-group mb-3" id="dynamicSignerList" style="max-height: 650px; overflow-y: auto;">
-                    <!-- Diisi JS -->
+
+                <div class="btn-group btn-group-toggle w-100" data-toggle="buttons">
+
+                    <label class="btn btn-outline-primary active">
+                        <input type="radio" name="placementType" value="custom" checked>
+                        Custom
+                        <small class="d-block">Drag & drop manually</small>
+                    </label>
+
+                    <label class="btn btn-outline-primary">
+                        <input type="radio" name="placementType" value="standard">
+                        Standard
+                        <small class="d-block">Auto place bottom right every page</small>
+                    </label>
+
+                    <label class="btn btn-outline-primary">
+                        <input type="radio" name="placementType" value="fixed">
+                        Fixed
+                        <small class="d-block">Add approval summary page</small>
+                    </label>
+
                 </div>
-                <small class="text-muted">
-                    <i class="fas fa-info-circle mr-1"></i> Drag ke PDF
-                </small>
+
             </div>
 
-            <!-- PDF AREA (Jadi Lebih Besar) -->
-            <div class="col-md-10">
-                <ul class="nav nav-tabs mb-3" id="fileTabs"></ul>
-                
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <button class="btn btn-sm btn-outline-secondary" id="prevPage">
-                        <i class="fas fa-chevron-left"></i> Prev
-                    </button>
-                    <small id="pageInfo" class="text-muted fw-bold">Page 1 of 1</small>
-                    <button class="btn btn-sm btn-outline-secondary" id="nextPage">
-                        Next <i class="fas fa-chevron-right"></i>
-                    </button>
+            <div class="row">
+                <!-- SIGNER PANEL -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold text-primary mb-3">
+                        <i class="fas fa-user-check mr-2"></i>Approvers (Show on Doc)
+                    </h6>
+                    <div class="list-group mb-3" id="dynamicSignerList">
+                        <!-- Diisi dinamis dari Step 2 data -->
+                        <div class="list-group-item text-muted small p-3 text-center">
+                            <i class="fas fa-info-circle"></i> Complete Step 2 first
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle mr-1"></i>Drag approvers to PDF
+                    </small>
+                </div>
+                <!-- PDF AREA -->
+                <div class="col-md-9">
+                    <ul class="nav nav-tabs mb-3" id="fileTabs"></ul>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <button class="btn btn-sm btn-outline-secondary" id="prevPage">
+                            <i class="fas fa-chevron-left"></i> Prev
+                        </button>
+                        <small id="pageInfo" class="text-muted">Page 1</small>
+                        <button class="btn btn-sm btn-outline-secondary" id="nextPage">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div id="pdfArea" class="pdf-area">
+                        <canvas id="pdfCanvas"></canvas>
+                    </div>
                 </div>
 
-                <div id="pdfArea" class="pdf-area">
-                    <canvas id="pdfCanvas"></canvas>
-                </div>
             </div>
-        </div>
 
-        <div class="text-right mt-4">
-            <button class="btn btn-secondary prevBtn">Back</button>
-            <button class="btn btn-primary nextBtn">Next</button>
-        </div>
+            <div class="text-right mt-3">
+                <button class="btn btn-secondary prevBtn">Back</button>
+                <button class="btn btn-primary nextBtn">Next</button>
+            </div>
 
+        </div>
     </div>
-</div>
     <!-- STEP 4  -->
     <div class="card shadow mb-4 step-content">
         <div class="card-body">
@@ -271,6 +283,7 @@
     // PDF Variables
     const pdfArea = document.getElementById('pdfArea');
     let draggedSigner = null;
+    let usedSigners = new Set();
     let uploadedFiles = [];
     let activeFileIndex = 0;
     const pdfCanvas = document.getElementById('pdfCanvas');
@@ -278,7 +291,6 @@
     let pdfDoc = null;
     let currentPage = 1;
     let totalPages = 0;
-    let MAX_FILES = 5;
 
 
     // ================= ADD & REMOVE CC =================
@@ -310,8 +322,6 @@
         $(document).on('click', '.removeCC', function () {
                 $(this).closest('.cc-row').remove();
         });
-
-        updateUploadAreaState();
 
     });
     
@@ -417,84 +427,47 @@
     // Drag handler untuk dynamic signers
     function handleSignerDragStart(e) {
         const signerId = this.dataset.signerId;
-        const currentFile = uploadedFiles[activeFileIndex];
-
-        // Hanya cek file saat ini (bukan semua file)
-        if (!currentFile || currentFile.usedSigners.has(signerId)) {
+        const signerName = this.dataset.signerName;
+        
+        if (usedSigners.has(signerId)) {
             e.preventDefault();
-            Swal.fire({
-                icon: 'info',
-                title: 'Sudah Digunakan',
-                text: 'Approver ini sudah ditempatkan di file ini.',
-                timer: 1500
-            });
             return false;
         }
-
+        
         draggedSigner = {
             id: signerId,
-            name: this.dataset.signerName,
-            tier: this.dataset.tier
+            name: signerName
         };
-
+        
+        // Visual feedback
         this.style.opacity = '0.5';
     }
 
-// ================= UPDATED: Per File Disable Logic =================
-// ================= UPDATE SIGNER UI (PERBAIKAN) =================
-// ✅ FIXED: Check per-file, not globally
-function updateSignerUIForCurrentFile() {
-    const currentFile = uploadedFiles[activeFileIndex];
-    
-    document.querySelectorAll('.signer-item').forEach(item => {
-        const signerId = item.dataset.signerId;
-        
-        // Only disable if used in THIS SPECIFIC FILE
-        const isUsedInThisFile = currentFile && currentFile.usedSigners.has(signerId);
-
-        if (isUsedInThisFile) {
-            item.classList.add('disabled');
-            item.style.opacity = '0.5';
-            item.style.pointerEvents = 'none';
-        } else {
-            item.classList.remove('disabled');
-            item.style.opacity = '1';
-            item.style.pointerEvents = 'auto';
-        }
-    });
-}
-
-// Panggil fungsi ini setiap kali switch file atau ada perubahan signature
-
     // Update usedSigners tracking untuk dynamic signers
-// 🔥 PERBAIKI: Check usedSigners di SEMUA files
-// function disableSignerUI(signerId) {
-//     // Disable UI jika signer digunakan di file MANAPUN
-//     const isUsedAnywhere = uploadedFiles.some(file => file.usedSigners.has(signerId));
-    
-//     document.querySelectorAll('.signer-item').forEach(item => {
-//         if (item.dataset.signerId === signerId) {
-//             if (isUsedAnywhere) {
-//                 item.classList.add('disabled');
-//                 item.style.opacity = '0.5';
-//                 item.style.pointerEvents = 'none';
-//             }
-//         }
-//     });
-// }
+    function disableSignerUI(signerId) {
+        usedSigners.add(signerId);
+        
+        // Disable di signer list
+        document.querySelectorAll('.signer-item').forEach(item => {
+            if (item.dataset.signerId === signerId) {
+                item.classList.add('disabled');
+                item.style.opacity = '0.5';
+                item.style.pointerEvents = 'none';
+            }
+        });
+    }
 
-// function enableSignerUI(signerId) {
-//     // Enable UI jika signer TIDAK digunakan di file MANAPUN
-//     const isUsedAnywhere = uploadedFiles.some(file => file.usedSigners.has(signerId));
-    
-//     document.querySelectorAll('.signer-item').forEach(item => {
-//         if (item.dataset.signerId === signerId && !isUsedAnywhere) {
-//             item.classList.remove('disabled');
-//             item.style.opacity = '1';
-//             item.style.pointerEvents = 'auto';
-//         }
-//     });
-// }
+    function enableSignerUI(signerId) {
+        usedSigners.delete(signerId);
+        
+        document.querySelectorAll('.signer-item').forEach(item => {
+            if (item.dataset.signerId === signerId) {
+                item.classList.remove('disabled');
+                item.style.opacity = '1';
+                item.style.pointerEvents = 'auto';
+            }
+        });
+    }
 
     // ================= NEXT BUTTON HANDLER - FULL VERSION =================
     document.querySelectorAll('.nextBtn').forEach(btn => {
@@ -567,6 +540,28 @@ function updateSignerUIForCurrentFile() {
                     return;
                 }
 
+                const duplicateValidation = validateNoDuplicateUsers();
+
+                if (!duplicateValidation.valid) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Duplicate User Detected',
+                        html: `
+                            <div class="text-left">
+                                <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+                                <strong>Duplicate users found:</strong><br>
+                                ${duplicateValidation.duplicates.map(dup => 
+                                    `<span class="badge badge-warning mr-1">${dup.user_name}</span>`
+                                ).join('<br>')}
+                                <hr class="my-2">
+                                <small class="text-muted">One user cannot be assigned to multiple tiers</small>
+                            </div>
+                        `,
+                        confirmButtonText: 'OK'
+                    });
+                    return;
+                }
+
                 const step2DataTemp = collectStep2Data();
                 
                 // Check minimal 1 approver total
@@ -581,7 +576,6 @@ function updateSignerUIForCurrentFile() {
                     return;
                 }
 
-                // 🔥 Count show_on_doc approvers untuk Step 3 preview
                 const showOnDocCount = step2DataTemp.approvers
                     .flatMap(tier => tier.approvers)
                     .filter(a => a.show_on_document).length;
@@ -625,135 +619,50 @@ function updateSignerUIForCurrentFile() {
             }
 
             // ================= STEP 3 VALIDATION - SIGNATURES =================
-// ================= STEP 3 VALIDATION - SIGNATURES =================
-if (currentStep === 2) {
-    const signatureData = collectSignatureData();
-    
-    // Check minimal 1 signature jika ada show_on_doc approvers
-    const hasShowOnDoc = step1Data.approvers_data?.approvers
-        ?.flatMap(tier => tier.approvers)
-        ?.some(a => a.show_on_document) || false;
+            if (currentStep === 2) {
+                const signatureData = collectSignatureData();
+                
+                // Check minimal 1 signature jika ada show_on_doc approvers
+                const hasShowOnDoc = step1Data.approvers_data?.approvers
+                    ?.flatMap(tier => tier.approvers)
+                    ?.some(a => a.show_on_document) || false;
 
-    // 🔥🔥 NEW: VALIDATION - EVERY APPROVER MUST BE ON EVERY FILE 🔥🔥
-    if (hasShowOnDoc) {
-        // Get all show_on_document approvers from Step 2
-        const showOnDocApprovers = [];
-        step1Data.approvers_data.approvers.forEach(tierData => {
-            tierData.approvers.forEach(approver => {
-                if (approver.show_on_document) {
-                    showOnDocApprovers.push({
-                        user_id: approver.user_id,
-                        name: approver.name,
-                        tier: tierData.tier
+                let totalSignatures = 0;
+                signatureData.forEach(file => {
+                    totalSignatures += file.signatures.length;
+                });
+
+                if (hasShowOnDoc && totalSignatures === 0) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'No Signature Placed',
+                        html: `
+                            <div class="text-left">
+                                <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+                                No signature positions placed on document.<br>
+                                <strong>Drag approvers from right panel to PDF</strong><br><br>
+                                <div class="mt-2 p-2 bg-light rounded">
+                                    <small class="text-muted">
+                                        Or switch to <strong>Standard</strong> / <strong>Fixed</strong> mode for auto-placement
+                                    </small>
+                                </div>
+                            </div>
+                        `,
+                        confirmButtonText: 'OK'
                     });
+                    return;
                 }
-            });
-        });
 
-        // Validation per file
-        let missingSignatures = [];
-        
-        uploadedFiles.forEach((file, fileIdx) => {
-            // Get signers used in this specific file
-            const fileSignerIds = new Set(file.signatures.map(s => s.signer_id));
-            
-            showOnDocApprovers.forEach(approver => {
-                if (!fileSignerIds.has(approver.user_id)) {
-                    missingSignatures.push({
-                        file_name: file.name,
-                        file_index: fileIdx,
-                        approver_name: approver.name,
-                        approver_id: approver.user_id,
-                        tier: approver.tier
-                    });
-                }
-            });
-        });
-
-        // If there are missing signatures, show error
-        if (missingSignatures.length > 0) {
-            // Group by file for cleaner display
-            const groupedByFile = {};
-            missingSignatures.forEach(m => {
-                if (!groupedByFile[m.file_name]) {
-                    groupedByFile[m.file_name] = [];
-                }
-                groupedByFile[m.file_name].push(`${m.approver_name} (Tier ${m.tier})`);
-            });
-
-            let errorHtml = `
-                <div class="text-left">
-                    <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
-                    <strong>All approvers must have signatures on ALL files!</strong><br><br>
-            `;
-
-            Object.keys(groupedByFile).forEach(fileName => {
-                errorHtml += `
-                    <div class="mb-2">
-                        <strong>📄 ${fileName}</strong><br>
-                        <span class="text-danger">Missing:</span> 
-                        ${groupedByFile[fileName].join(', ')}
-                    </div>
-                `;
-            });
-
-            errorHtml += `
-                    <div class="mt-3 p-2 bg-light rounded">
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle text-info mr-1"></i>
-                            Drag approvers from right panel to each PDF file<br>
-                            Or switch to <strong>Standard</strong> / <strong>Fixed</strong> mode for auto-placement
-                        </small>
-                    </div>
-                </div>
-            `;
-
-            Swal.fire({
-                icon: 'warning',
-                title: 'Incomplete Signature Placement',
-                html: errorHtml,
-                confirmButtonText: 'OK'
-            });
-            return;
-        }
-    }
-
-    let totalSignatures = 0;
-    signatureData.forEach(file => {
-        totalSignatures += file.signatures.length;
-    });
-
-    if (hasShowOnDoc && totalSignatures === 0) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'No Signature Placed',
-            html: `
-                <div class="text-left">
-                    <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
-                    No signature positions placed on document.<br>
-                    <strong>Drag approvers from right panel to PDF</strong><br><br>
-                    <div class="mt-2 p-2 bg-light rounded">
-                        <small class="text-muted">
-                            Or switch to <strong>Standard</strong> / <strong>Fixed</strong> mode for auto-placement
-                        </small>
-                    </div>
-                </div>
-            `,
-            confirmButtonText: 'OK'
-        });
-        return;
-    }
-
-    console.log('✅ Step 3 Signature Data:', signatureData);
-    
-    // Save signature data
-    step1Data.signature_data = signatureData;
-    
-    // Auto proceed ke Step 4
-    currentStep++;
-    updateStep();
-    return;
-}
+                console.log('✅ Step 3 Signature Data:', signatureData);
+                
+                // Save signature data
+                step1Data.signature_data = signatureData;
+                
+                // Auto proceed ke Step 4
+                currentStep++;
+                updateStep();
+                return;
+            }
 
             // ================= STEP 4 - FINAL VALIDATION =================
             if (currentStep === 3) {
@@ -823,6 +732,51 @@ if (currentStep === 2) {
         });
     });
 
+    function validateNoDuplicateUsers() {
+        const step2Data = collectStep2Data();
+        const userTierMap = new Map(); // user_id -> [tier1, tier2, ...]
+        const duplicates = [];
+
+        // Kumpulkan semua user dan tiernya
+        step2Data.approvers.forEach(tierData => {
+            tierData.approvers.forEach(approver => {
+                const userId = approver.user_id;
+                
+                if (userTierMap.has(userId)) {
+                    userTierMap.get(userId).push(tierData.tier);
+                } else {
+                    userTierMap.set(userId, [tierData.tier]);
+                }
+            });
+        });
+
+        // Cek duplikasi
+        userTierMap.forEach((tiers, userId) => {
+            if (tiers.length > 1) {
+                // Cari nama user dari step2Data
+                let userName = 'Unknown User';
+                for (let tier of step2Data.approvers) {
+                    const user = tier.approvers.find(a => a.user_id == userId);
+                    if (user) {
+                        userName = user.name;
+                        break;
+                    }
+                }
+                
+                duplicates.push({
+                    user_id: userId,
+                    user_name: userName,
+                    tiers: tiers
+                });
+            }
+        });
+
+        return {
+            valid: duplicates.length === 0,
+            duplicates: duplicates
+        };
+    }
+
     function validateApproversPerTier() {
         let isValid = true;
         let errorMessage = '';
@@ -878,6 +832,10 @@ if (currentStep === 2) {
                             ${group.title || 'Tier ' + group.tier} • ${group.division_name}
                             ${group.sla_days > 0 ? `<small class="text-muted">(${group.sla_days} days SLA)</small>` : ''}
                         </h6>
+                        <input type="hidden" 
+                            class="sla-days-input" 
+                            name="sla_days_${group.tier}"
+                            value="${group.sla_days || 0}">
                         <div class="approvers-list" data-tier="${group.tier}" data-division-id="${group.division_id || ''}"></div>
                         
                         <button type="button" class="btn btn-outline-primary btn-sm mt-2 add-approver-per-tier"
@@ -1032,140 +990,115 @@ if (currentStep === 2) {
         e.preventDefault();
     });
 
-    pdfArea.addEventListener('drop', function (e) {
+pdfArea.addEventListener('drop', function (e) {
     e.preventDefault();
     if (!draggedSigner || !draggedSigner.id) return;
 
     const currentFile = uploadedFiles[activeFileIndex];
-    if (!currentFile.usedSigners.has(draggedSigner.id)) { // Perbaiki kondisi
-        const canvasRect = pdfCanvas.getBoundingClientRect();
-        const xPx = e.clientX - canvasRect.left;
-        const yPx = e.clientY - canvasRect.top;
-        const xPercent = xPx / canvasRect.width;
-        const yPercent = yPx / canvasRect.height;
+    if (!currentFile || currentFile.usedSigners.has(draggedSigner.id)) return;
 
-        // 🔥 SIMPAN signature KE FILE AKTIF
-        const signatureData = {
-            signer_id: draggedSigner.id,
-            signer_name: draggedSigner.name,
-            tier: parseInt(draggedSigner.tier || 1),
-            page: currentPage,
-            x_percent: xPercent,
-            y_percent: yPercent
-        };
+    const canvasRect = pdfCanvas.getBoundingClientRect();
+    const rect = pdfArea.getBoundingClientRect();
+    
+    // 🔥 Hitung posisi relatif terhadap canvas (bukan pdfArea)
+    const xPx = e.clientX - canvasRect.left;
+    const yPx = e.clientY - canvasRect.top;
+    const xPercent = Math.max(0, Math.min(1, xPx / canvasRect.width));
+    const yPercent = Math.max(0, Math.min(1, yPx / canvasRect.height));
 
-        currentFile.signatures.push(signatureData);
-        currentFile.usedSigners.add(draggedSigner.id);
-        updateSignerUIForCurrentFile();
-        
-        // Buat visual box
-        const box = document.createElement('div');
-        box.classList.add('signature-box');
-        box.dataset.signerId = draggedSigner.id;
-        box.dataset.signerName = draggedSigner.name;
-        box.dataset.page = currentPage;
-        box.dataset.x = xPercent;
-        box.dataset.y = yPercent;
-        box.dataset.tier = draggedSigner.tier || 1;
-        box.dataset.fileIndex = activeFileIndex; // 🔥 Track file
+    const box = document.createElement('div');
+    box.classList.add('signature-box');
+    box.dataset.signerId = draggedSigner.id;
+    box.dataset.signerName = draggedSigner.name;
+    box.dataset.page = currentPage;
+    box.dataset.x = xPercent.toFixed(4);  // 🔥 Fixed precision
+    box.dataset.y = yPercent.toFixed(4);  // 🔥 Fixed precision
+    box.dataset.tier = draggedSigner.tier || 1;
 
-        box.innerHTML = `
-            <div class="delete-signature">&times;</div>
-            <div class="signer-info">
-                <span class="signer-name">${draggedSigner.name}</span><br>
-                <small class="tier-info">Tier ${box.dataset.tier} • Signature</small>
-            </div>
-        `;
+    box.innerHTML = `
+        <div class="delete-signature">&times;</div>
+        <div class="signer-info">
+            <small class="text-muted">Approved by</small><br>
+            <span class="signer-name">${box.dataset.signerName}</span>
+            <small class="tier-info">Tier ${box.dataset.tier}</small>
+        </div>
+    `;
 
-        positionSignatureBox(box);
-        makeDraggable(box);
-        pdfArea.appendChild(box);
+    // 🔥 Position SEBELUM append ke DOM (penting!)
+    positionSignatureBox(box);
+    makeDraggable(box);
+    pdfArea.appendChild(box);
 
-        currentFile.usedSigners.add(draggedSigner.id);
-        updateSignerUIForCurrentFile();
-        
-        // Update UI global
-        // disableSignerUI(draggedSigner.id);
-        draggedSigner = null;
-    }
+    // Track usage
+    currentFile.usedSigners.add(draggedSigner.id);
+    disableSignerUI(draggedSigner.id);
+
+    // Save signature data
+    currentFile.signatures.push({
+        signer_id: draggedSigner.id,
+        signer_name: draggedSigner.name,
+        tier: parseInt(draggedSigner.tier || 1),
+        page: currentPage,
+        x_percent: xPercent,
+        y_percent: yPercent
+    });
+
+    draggedSigner = null;
 });
 
     // Signer UI Controls
-    // function disableSignerUI(name) {
-    //     const currentFile = uploadedFiles[activeFileIndex];
-    //     currentFile.usedSigners.add(name);
-    //     document.querySelectorAll('.signer-item').forEach(item => {
-    //         if (item.dataset.signer === name) {
-    //             item.classList.add('disabled');
-    //             item.style.opacity = 0.5;
-    //             item.style.pointerEvents = 'none';
-    //         }
-    //     });
-    // }
+    function disableSignerUI(name) {
+        const currentFile = uploadedFiles[activeFileIndex];
+        currentFile.usedSigners.add(name);
+        document.querySelectorAll('.signer-item').forEach(item => {
+            if (item.dataset.signer === name) {
+                item.classList.add('disabled');
+                item.style.opacity = 0.5;
+                item.style.pointerEvents = 'none';
+            }
+        });
+    }
 
-    // function enableSignerUI(name) {
-    //     const currentFile = uploadedFiles[activeFileIndex];
-    //     currentFile.usedSigners.delete(name);
-    //     document.querySelectorAll('.signer-item').forEach(item => {
-    //         if (item.dataset.signer === name) {
-    //             item.classList.remove('disabled');
-    //             item.style.opacity = 1;
-    //             item.style.pointerEvents = 'auto';
-    //         }
-    //     });
-    // }
+    function enableSignerUI(name) {
+        const currentFile = uploadedFiles[activeFileIndex];
+        currentFile.usedSigners.delete(name);
+        document.querySelectorAll('.signer-item').forEach(item => {
+            if (item.dataset.signer === name) {
+                item.classList.remove('disabled');
+                item.style.opacity = 1;
+                item.style.pointerEvents = 'auto';
+            }
+        });
+    }
 
     // Delete Signature
-// ================= DELETE SIGNATURE (FIXED) =================
-document.addEventListener('click', function (e) {
-    if (e.target.classList.contains('delete-signature')) {
-        const box = e.target.closest('.signature-box');
-        if (!box) return;
-
-        const signerId = box.dataset.signerId;
-        const page = parseInt(box.dataset.page);
-        const fileIndex = parseInt(box.dataset.fileIndex || activeFileIndex);
-
-        // Hapus box dari DOM
-        box.remove();
-
-        // Hapus dari data file terkait
-        const file = uploadedFiles[fileIndex];
-        if (file) {
-            // Hapus signature dari array
-            file.signatures = file.signatures.filter(sig => 
-                !(sig.signer_id == signerId && sig.page == page)
-            );
-
-            // Cek apakah signer masih digunakan di **semua file**
-            const isStillUsedAnywhere = uploadedFiles.some((f, idx) => {
-                return f.signatures.some(sig => sig.signer_id == signerId);
-            });
-
-            // Jika tidak digunakan di mana pun → enable kembali
-            if (!isStillUsedAnywhere) {
-                file.usedSigners.delete(signerId); // bersihkan juga di file ini
-                updateSignerUIForCurrentFile();   // refresh UI
-            }
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('delete-signature')) {
+            const box = e.target.closest('.signature-box');
+            const signerName = box.dataset.signer;
+            box.remove();
+            usedSigners.delete(signerName);
+            enableSignerUI(signerName);
         }
+    });
 
-        // Re-render signatures di halaman saat ini
-        renderSignaturesForPage(currentPage);
-    }
-});
     // Draggable Signature Boxes
 function makeDraggable(element) {
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
-    const fileIndex = parseInt(element.dataset.fileIndex || activeFileIndex);
 
     element.addEventListener('pointerdown', function (e) {
         if (e.target.classList.contains('delete-signature')) return;
+        
         isDragging = true;
         offsetX = e.offsetX;
         offsetY = e.offsetY;
         element.setPointerCapture(e.pointerId);
+        
+        // Visual feedback saat drag
+        element.style.zIndex = '1000';
+        element.style.boxShadow = '0 8px 25px rgba(78,115,223,0.4)';
     });
 
     element.addEventListener('pointermove', function (e) {
@@ -1175,44 +1108,74 @@ function makeDraggable(element) {
         let x = e.clientX - canvasRect.left - offsetX;
         let y = e.clientY - canvasRect.top - offsetY;
 
-        const xPercent = x / canvasRect.width;
-        const yPercent = y / canvasRect.height;
+        // Clamp ke dalam canvas bounds
+        x = Math.max(0, Math.min(x, canvasRect.width - element.offsetWidth));
+        y = Math.max(0, Math.min(y, canvasRect.height - element.offsetHeight));
 
-        // 🔥 UPDATE DATA signature di file
-        element.dataset.x = xPercent;
-        element.dataset.y = yPercent;
+        // 🔥 UPDATE DATASET DENGAN POSISI BARU
+        element.dataset.x = (x / canvasRect.width).toFixed(4);
+        element.dataset.y = (y / canvasRect.height).toFixed(4);
 
-        // Update di array signatures
-        const file = uploadedFiles[fileIndex];
-        if (file) {
-            file.signatures = file.signatures.map(sig => {
-                if (sig.signer_id === element.dataset.signerId && 
-                    sig.page === parseInt(element.dataset.page)) {
-                    return {
-                        ...sig,
-                        x_percent: xPercent,
-                        y_percent: yPercent
-                    };
-                }
-                return sig;
-            });
-        }
+        // Update signature data di uploadedFiles
+        updateSignatureData(element);
 
-        positionSignatureBox(element);
+        // Position element
+        element.style.left = x + 'px';
+        element.style.top = y + 'px';
     });
 
     element.addEventListener('pointerup', function () {
+        if (isDragging) {
+            isDragging = false;
+            element.style.zIndex = '';
+            element.style.boxShadow = '';
+        }
+    });
+
+    // Handle pointer cancel (touch devices)
+    element.addEventListener('pointercancel', function () {
         isDragging = false;
+        element.style.zIndex = '';
+        element.style.boxShadow = '';
     });
 }
 
-    function positionSignatureBox(box) {
-        const canvasRect = pdfCanvas.getBoundingClientRect();
-        const x = box.dataset.x * canvasRect.width;
-        const y = box.dataset.y * canvasRect.height;
-        box.style.left = x + 'px';
-        box.style.top = y + 'px';
+
+function updateSignatureData(signatureBox) {
+    const signerId = signatureBox.dataset.signerId;
+    const page = parseInt(signatureBox.dataset.page);
+    const xPercent = parseFloat(signatureBox.dataset.x);
+    const yPercent = parseFloat(signatureBox.dataset.y);
+    const tier = parseInt(signatureBox.dataset.tier);
+
+    // Update di uploadedFiles
+    const currentFile = uploadedFiles[activeFileIndex];
+    if (currentFile) {
+        currentFile.signatures = currentFile.signatures.map(sig => {
+            if (sig.signer_id == signerId && sig.page === page) {
+                return {
+                    ...sig,
+                    x_percent: xPercent,
+                    y_percent: yPercent,
+                    tier: tier
+                };
+            }
+            return sig;
+        });
     }
+}
+ function positionSignatureBox(box) {
+    const canvasRect = pdfCanvas.getBoundingClientRect();
+    const x = parseFloat(box.dataset.x || 0) * canvasRect.width;
+    const y = parseFloat(box.dataset.y || 0) * canvasRect.height;
+    
+    // Clamp position
+    const maxX = canvasRect.width - box.offsetWidth;
+    const maxY = canvasRect.height - box.offsetHeight;
+    
+    box.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+    box.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+}
 
     // ================= PDF UPLOAD - DRAG & DROP + CLICK AREA =================
     const uploadArea = document.getElementById('uploadArea');
@@ -1245,112 +1208,45 @@ function makeDraggable(element) {
     });
 
     // Fungsi utama untuk memproses file (dipakai oleh click dan drop)
-// ================= PDF UPLOAD - DRAG & DROP + CLICK AREA =================
-function handleFiles(files) {
-    const currentTotal = uploadedFiles.length;
-    const remaining = MAX_FILES - currentTotal;
+    function handleFiles(files) {
+        files.forEach(file => {
+            if (file.type !== "application/pdf") {
+                alert("Hanya file PDF yang diperbolehkan!");
+                return;
+            }
 
-    if (files.length > remaining) {
-        Swal.fire({
-            icon: 'warning',
-            html: `You can only upload a maximum of <strong>${MAX_FILES}</strong> files.`,
-            confirmButtonText: 'OK'
+            const reader = new FileReader();
+            reader.onload = function () {
+                const pdfData = new Uint8Array(this.result);
+                
+                // 🔥 CONVERT KE BLOB UNTUK UPLOAD
+                const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
+
+                pdfjsLib.getDocument(pdfData).promise.then(pdf => {
+                    uploadedFiles.push({
+                        name: file.name,
+                        pdfData: pdfData,      // Tetap untuk PDF.js render
+                        pdfBlob: pdfBlob,      // 🔥 UNTUK UPLOAD
+                        totalPages: pdf.numPages,
+                        signatures: [],
+                        usedSigners: new Set()
+                    });
+
+                    renderFileList();
+                    renderFileTabs();
+                    
+                    if (uploadedFiles.length === 1) {
+                        switchFile(0);
+                    }
+                }).catch(err => {
+                    console.error("Error loading PDF:", err);
+                    alert("Gagal memproses file PDF.");
+                });
+            };
+            reader.readAsArrayBuffer(file);
         });
-        // Hanya proses sebanyak yang masih boleh
-        files = Array.from(files).slice(0, remaining);
     }
 
-    if (files.length === 0) return;
-
-    files.forEach(file => {
-        if (file.type !== "application/pdf") {
-            Swal.fire({
-               icon: 'error',
-                title: 'Invalid File Type',
-                text: 'Only PDF files are permitted. Please upload a PDF document.',
-            });
-            return;
-        }
-
-        const reader = new FileReader();
-
-        const MAX_SIZE_MB = 25;   // ← Ubah di sini
-
-if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-    Swal.fire({
-        icon: 'warning',
-        title: 'File Too Large',
-        html: `Maximum file size is <strong>${MAX_SIZE_MB} MB</strong>.<br>
-               Your file: <strong>${(file.size / 1024 / 1024).toFixed(2)} MB</strong>`,
-        confirmButtonText: 'OK'
-    });
-    return;
-}
-
-        reader.onload = function () {
-            const pdfData = new Uint8Array(this.result);
-            const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
-
-            pdfjsLib.getDocument(pdfData).promise.then(pdf => {
-                uploadedFiles.push({
-                    name: file.name,
-                    pdfData: pdfData,
-                    pdfBlob: pdfBlob,
-                    totalPages: pdf.numPages,
-                    signatures: [],
-                    usedSigners: new Set()
-                });
-
-                renderFileList();
-                renderFileTabs();
-
-                if (uploadedFiles.length === 1) {
-                    switchFile(0);
-                }
-
-                // Disable upload area jika sudah mencapai batas
-                updateUploadAreaState();
-            }).catch(err => {
-                console.error("Error loading PDF:", err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal Memproses PDF',
-                    text: 'File PDF rusak atau tidak dapat dibaca.'
-                });
-            });
-        };
-        reader.readAsArrayBuffer(file);
-    });
-}
-
-function updateUploadAreaState() {
-    const uploadArea = document.getElementById('uploadArea');
-    const isMax = uploadedFiles.length >= MAX_FILES;
-
-    if (isMax) {
-    uploadArea.style.opacity = '0.6';
-    uploadArea.style.pointerEvents = 'none';
-    uploadArea.innerHTML = `
-        <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
-        <h6 class="mb-1 text-success">Maximum ${MAX_FILES} Files Reached</h6>
-        <p class="text-muted small">You have uploaded ${uploadedFiles.length} file(s).</p>
-    `;
-} else {
-    uploadArea.style.opacity = '1';
-    uploadArea.style.pointerEvents = 'auto';
-    uploadArea.innerHTML = `
-        <i class="fas fa-cloud-upload-alt fa-3x mb-3 text-primary"></i>
-        <h6 class="mb-1">Drag & Drop PDF here</h6>
-        <p class="text-muted small mb-3">or</p>
-        <button type="button" class="btn btn-primary btn-sm px-4" onclick="document.getElementById('pdfInput').click()">
-            <i class="fas fa-folder-open"></i> Choose File
-        </button>
-        <p class="text-muted mt-3 mb-0" style="font-size: 13px;">
-            Max ${MAX_FILES} files • Max 25 MB per file • PDF only
-        </p>
-    `;
-}
-}
     // Input file change (backup)
     pdfInput.addEventListener('change', function (e) {
         if (e.target.files.length > 0) {
@@ -1359,45 +1255,51 @@ function updateUploadAreaState() {
         }
     });
 
-function renderPDF(pageNumber = 1) {
-    if (!uploadedFiles[activeFileIndex]) return;
+    function renderPDF(pageNumber = 1) {
+        if (!uploadedFiles[activeFileIndex]) return;
 
-    const file = uploadedFiles[activeFileIndex];
+        const file = uploadedFiles[activeFileIndex];
 
-    pdfjsLib.getDocument(file.pdfData).promise.then(pdf => {
-        pdfDoc = pdf;
-        totalPages = pdf.numPages;
+        pdfjsLib.getDocument(file.pdfData).promise.then(pdf => {
+            pdfDoc = pdf;
+            totalPages = pdf.numPages;
 
-        pdf.getPage(pageNumber).then(page => {
-            const viewport = page.getViewport({ scale: 1.5 }); // Naikkan scale awal
+            pdf.getPage(pageNumber).then(p => {
+                const viewport = p.getViewport({ scale: 1 });
+                const scale = Math.min(
+                    pdfArea.clientWidth / viewport.width,
+                    pdfArea.clientHeight / viewport.height
+                );
+                const scaled = p.getViewport({ scale });
 
-            // Scale agar pas di area besar
-            const containerWidth = pdfArea.clientWidth - 40;
-            const scale = Math.min(
-                containerWidth / viewport.width,
-                1.8  // batas maksimal zoom
-            );
+                pdfCanvas.width = scaled.width;
+                pdfCanvas.height = scaled.height;
 
-            const scaledViewport = page.getViewport({ scale });
+                ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
 
-            pdfCanvas.width = scaledViewport.width;
-            pdfCanvas.height = scaledViewport.height;
+                if (renderTask) {
+                    renderTask.cancel();
+                }
 
-            ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+                renderTask = p.render({
+                    canvasContext: ctx,
+                    viewport: scaled
+                });
 
-            page.render({
-                canvasContext: ctx,
-                viewport: scaledViewport
-            }).promise.then(() => {
-                $('#pageInfo').text(`Page ${currentPage} of ${totalPages}`);
-                renderSignaturesForPage(currentPage);
+                renderTask.promise.then(() => {
+                    $('#pageInfo').text(`Page ${currentPage} of ${totalPages}`);
+                    renderSignaturesForPage(currentPage);
+                }).catch(err => {
+                    if (err.name !== 'RenderingCancelledException') {
+                        console.error(err);
+                    }
+                });
             });
         });
-    });
-}
+    }
 
 function renderSignaturesForPage(page) {
-    // Hapus SEMUA signature box lama (global)
+    // Hapus semua signature box lama
     document.querySelectorAll('.signature-box').forEach(box => box.remove());
 
     const file = uploadedFiles[activeFileIndex];
@@ -1405,65 +1307,63 @@ function renderSignaturesForPage(page) {
 
     const placementType = document.querySelector('input[name="placementType"]:checked').value;
 
-    // 🔥 IMPORTANT: HANYA render visual box untuk CUSTOM mode
-    if (placementType === 'custom') {
-        file.signatures.forEach(sig => {
-            if (sig.page === page) {
-                const box = document.createElement('div');
-                box.classList.add('signature-box');
-                box.dataset.signerId = sig.signer_id;
-                box.dataset.signerName = sig.signer_name;
-                box.dataset.page = sig.page;
-                box.dataset.x = sig.x_percent;
-                box.dataset.y = sig.y_percent;
-                box.dataset.tier = sig.tier || 1;
-                box.dataset.fileIndex = activeFileIndex;
+    if (placementType === 'standard' || placementType === 'fixed') {
+        return;
+    }
 
-                box.innerHTML = `
-                    <div class="delete-signature">&times;</div>
-                    <div class="signer-info">
-                        <span class="signer-name">${sig.signer_name}</span><br>
-                        <small class="tier-info">Tier ${sig.tier} • Signature</small>
-                    </div>
-                `;
+    // Render dari data signatures yang tersimpan
+    file.signatures.forEach(sig => {
+        if (sig.page === page) {
+            const box = document.createElement('div');
+            box.classList.add('signature-box');
+            box.dataset.signerId = sig.signer_id;
+            box.dataset.signerName = sig.signer_name || 'Unknown';
+            box.dataset.page = sig.page;
+            box.dataset.x = sig.x_percent.toFixed(4);
+            box.dataset.y = sig.y_percent.toFixed(4);
+            box.dataset.tier = sig.tier || 1;
 
-                positionSignatureBox(box);
-                makeDraggable(box);
-                pdfArea.appendChild(box);
-                updateSignerUIForCurrentFile();
-            }
+            box.innerHTML = `
+                <div class="delete-signature">&times;</div>
+                <div class="signer-info">
+                    <small class="text-muted">Approved by</small><br>
+                    <span class="signer-name">${box.dataset.signerName}</span>
+                    <small class="tier-info">Tier ${box.dataset.tier}</small>
+                </div>
+            `;
+
+            positionSignatureBox(box);
+            makeDraggable(box);
+            pdfArea.appendChild(box);
+        }
+    });
+}
+
+    function resetAllSignerUI() {
+        usedSigners.clear();
+        document.querySelectorAll('.signer-item').forEach(item => {
+            item.style.opacity = 1;
+            item.style.pointerEvents = 'auto';
+            item.classList.remove('disabled');
+        });
+        
+        uploadedFiles.forEach(file => {
+            file.usedSigners.clear();
         });
     }
-    // Untuk standard/fixed: TIDAK render visual box sama sekali
-}
-
-function resetAllSignerUI() {
-    // Reset semua file usedSigners
-    uploadedFiles.forEach(file => {
-        file.usedSigners.clear();
-    });
-    
-    // Reset UI
-    document.querySelectorAll('.signer-item').forEach(item => {
-        item.style.opacity = '1';
-        item.style.pointerEvents = 'auto';
-        item.classList.remove('disabled');
-    });
-}
 
     // Page Navigation
-// Page Navigation - Re-render signatures
-document.getElementById('prevPage').addEventListener('click', function () {
-    if (currentPage <= 1) return;
-    currentPage--;
-    renderPDF(currentPage);
-});
+    document.getElementById('prevPage').addEventListener('click', function () {
+        if (currentPage <= 1) return;
+        currentPage--;
+        renderPDF(currentPage);
+    });
 
-document.getElementById('nextPage').addEventListener('click', function () {
-    if (currentPage >= totalPages) return;
-    currentPage++;
-    renderPDF(currentPage);
-});
+    document.getElementById('nextPage').addEventListener('click', function () {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+        renderPDF(currentPage);
+    });
 
     // ================= DATA COLLECTION =================
     function collectSignatureData() {
@@ -1523,23 +1423,14 @@ document.getElementById('nextPage').addEventListener('click', function () {
                 });
             } 
             else if(type === 'fixed') {
-                const summaryPage = file.totalPages; // Tambah halaman summary
                 showOnDocApprovers.forEach((approver, index) => {
-                    const positions = [
-                        {x: 0.15, y: 0.20}, // Top Left
-                        {x: 0.55, y: 0.20}, // Top Right  
-                        {x: 0.15, y: 0.50}, // Middle Left
-                        {x: 0.55, y: 0.50}  // Middle Right
-                    ];
-                    
-                    const pos = positions[index % positions.length];
                     fileData.signatures.push({
                         approver_id: approver.user_id,
                         division_id: approver.division_id,
                         tier: approver.tier,
-                        page_number: summaryPage,
-                        pos_x_percent: pos.x,
-                        pos_y_percent: pos.y,
+                        page_number: file.totalPages,           // Halaman terakhir
+                        pos_x_percent: 0.78,                    // Kanan (sedikit ke dalam)
+                        pos_y_percent: 0.75 + (index * 0.09),  // Mulai dari 75%, turun tiap baris
                         mode: 'fixed'
                     });
                 });
@@ -1590,7 +1481,7 @@ document.getElementById('nextPage').addEventListener('click', function () {
                 if (approverId) {
                     tierApprovers.push({
                         user_id: approverId,
-                        name: selectedOption.text().trim() || 'Unknown Approver',   // ← TAMBAHKAN INI
+                        name: selectedOption.text().trim() || 'Unknown Approver',
                         division_id: selectedOption.data('division') || $(this).data('division') || '',
                         show_on_document: showOnDoc.is(':checked')
                     });
@@ -1601,6 +1492,8 @@ document.getElementById('nextPage').addEventListener('click', function () {
                 approvers.push({
                     tier: parseInt(tier),
                     division_id: $('.approvers-list[data-tier="' + tier + '"]').data('division-id') || '',
+                    // Tambahkan SLA days dari input di tier-box
+                    sla_days: $(this).find('input[name="sla_days"]').val() || $(this).find('.sla-days-input').val() || 0,
                     approvers: tierApprovers
                 });
             }
@@ -1629,111 +1522,90 @@ document.getElementById('nextPage').addEventListener('click', function () {
     }
 
     // ================= PLACEMENT MODE =================
-document.querySelectorAll('input[name="placementType"]').forEach(radio => {
-    radio.addEventListener('change', function () {
-        const type = this.value;
+    document.querySelectorAll('input[name="placementType"]').forEach(radio => {
+        radio.addEventListener('change', function () {
+            const type = this.value;
 
-        // Clear visual boxes
-        document.querySelectorAll('.signature-box').forEach(b => b.remove());
-        
-        if (type === 'custom') {
-            // 🔥 CUSTOM MODE: Clear signatures (user drag manual), keep usedSigners
+            // Clear semua signature boxes
+            document.querySelectorAll('.signature-box').forEach(b => b.remove());
+            
+            // Reset signer state
+            usedSigners.clear();
+            resetAllSignerUI();
+
+            // Reset file signatures
             uploadedFiles.forEach(file => {
-                file.signatures = []; // Reset signatures untuk drag baru
-                // usedSigners TIDAK diubah - tracking approver yang sudah dipakai
+                file.signatures = [];
+                file.usedSigners.clear();
             });
-            enableSignerPanel(); // Enable drag panel
-        } 
-        else if (type === 'standard' || type === 'fixed') {
-            // 🔥 STANDARD/FIXED: Generate auto signatures, disable panel
-            disableSignerPanel();
-            applyStandardFixedSignatures(type);
-        }
 
-        if (pdfDoc && totalPages > 0) {
-            renderPDF(currentPage);
-        }
-    });
-});
+            // Re-render PDF
+            if (pdfDoc && totalPages > 0) {
+                renderPDF(currentPage);
+            }
 
-// Tambahkan fungsi enableSignerPanel()
-function enableSignerPanel() {
-    document.querySelectorAll('.signer-item').forEach(item => {
-        const signerId = item.dataset.signerId;
-        const isUsedAnywhere = uploadedFiles.some(file => 
-            file.usedSigners.has(signerId)
-        );
-        
-        if (!isUsedAnywhere) {
-            item.classList.remove('disabled');
-            item.style.opacity = '1';
-            item.style.pointerEvents = 'auto';
-        }
-    });
-}
-function applyStandardFixedSignatures(mode) {
-    const step2Data = collectStep2Data();
-    const showOnDocApprovers = [];
-    
-    step2Data.approvers.forEach(tierData => {
-        tierData.approvers.forEach(approver => {
-            if (approver.show_on_document) {
-                showOnDocApprovers.push({
-                    id: approver.user_id,
-                    name: approver.name,
-                    tier: tierData.tier,
-                    division_id: approver.division_id
-                });
+            if (type === 'standard' || type === 'fixed') {
+                disableSignerPanel();
+                applyStandardFixedSignatures(type);
             }
         });
     });
 
-    uploadedFiles.forEach(file => {
-        file.signatures = [];
-        file.usedSigners.clear();
+    function applyStandardFixedSignatures(mode) {
+        const step2Data = collectStep2Data();
+        const showOnDocApprovers = [];
+        
+        step2Data.approvers.forEach(tierData => {
+            tierData.approvers.forEach(approver => {
+                if (approver.show_on_document) {
+                    showOnDocApprovers.push({
+                        id: approver.user_id,
+                        name: approver.name,
+                        tier: tierData.tier,
+                        division_id: approver.division_id
+                    });
+                }
+            });
+        });
 
-        if (mode === 'standard') {
-            for (let p = 1; p <= file.totalPages; p++) {
-                showOnDocApprovers.forEach(approver => {
+        uploadedFiles.forEach(file => {
+            file.signatures = [];
+            file.usedSigners.clear();
+
+            if (mode === 'standard') {
+                for (let p = 1; p <= file.totalPages; p++) {
+                    showOnDocApprovers.forEach(approver => {
+                        file.signatures.push({
+                            signer_id: approver.id,
+                            signer_name: approver.name,
+                            tier: approver.tier,
+                            page: p,
+                            x_percent: 0.85,
+                            y_percent: 0.90,
+                            mode: 'standard'
+                        });
+                        file.usedSigners.add(approver.id);
+                    });
+                }
+            } 
+            else if (mode === 'fixed') {
+                showOnDocApprovers.forEach((approver, index) => {
                     file.signatures.push({
                         signer_id: approver.id,
                         signer_name: approver.name,
                         tier: approver.tier,
-                        page: p,
-                        x_percent: 0.85,
-                        y_percent: 0.90,
-                        mode: 'standard'
+                        page: file.totalPages,                  // Halaman terakhir
+                        x_percent: 0.78,
+                        y_percent: 0.75 + (index * 0.09),      // Vertikal stacking
+                        mode: 'fixed'
                     });
                     file.usedSigners.add(approver.id);
                 });
             }
-        } 
-        else if (mode === 'fixed') {
-            const lastPage = file.totalPages;
-            showOnDocApprovers.forEach((approver, index) => {
-                const positions = [
-                    {x: 0.15, y: 0.20}, {x: 0.55, y: 0.20},
-                    {x: 0.15, y: 0.50}, {x: 0.55, y: 0.50}
-                ];
-                const pos = positions[index % positions.length];
+        });
 
-                file.signatures.push({
-                    signer_id: approver.id,
-                    signer_name: approver.name,
-                    tier: approver.tier,
-                    page: lastPage,
-                    x_percent: pos.x,
-                    y_percent: pos.y,
-                    mode: 'fixed'
-                });
-                file.usedSigners.add(approver.id);
-            });
-        }
-    });
-
-    // ✅ HAPUS renderSignaturesForPage() - tidak perlu visual box
-    updateSignerUIForCurrentFile();
-}
+        renderSignaturesForPage(currentPage);
+    }
 
     function disableSignerPanel() {
         document.querySelectorAll('.signer-item').forEach(item => {
@@ -1778,7 +1650,6 @@ function applyStandardFixedSignatures(mode) {
                 uploadedFiles.splice(index, 1);
                 renderFileList();
                 renderFileTabs();
-                updateUploadAreaState();
                 if (uploadedFiles.length === 0) {
                     activeFileIndex = 0;
                 }
@@ -1806,16 +1677,14 @@ function applyStandardFixedSignatures(mode) {
     function switchFile(index) {
         activeFileIndex = index;
         currentPage = 1;
-        pdfRendered = false;
+        pdfRendered = false; 
         
         document.querySelectorAll('.signature-box').forEach(b => b.remove());
         
         renderFileTabs();
-        renderPDF();
-        
-        // ✅ ADD THIS: Refresh signer UI for new file
-        updateSignerUIForCurrentFile();
+        renderPDF(); // Akan render tanpa signatures lama
     }
+
     // ================= JQUERY DOCUMENT READY - SIGNER & APPROVAL =================
     $(document).ready(function () {
         checkSigner();
@@ -1950,7 +1819,6 @@ function applyStandardFixedSignatures(mode) {
         });
     }
 
-    // ================= COLLECT COMPLETE PAYLOAD FOR BACKEND =================
     function collectCompletePayload() {
         const step1 = collectStep1Data();
         const step2 = collectStep2Data();
@@ -2026,8 +1894,8 @@ function applyStandardFixedSignatures(mode) {
         if (!subject || !message) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Validation Failed',
-                text: 'Email Subject and Email Message are required!',
+                title: 'Validasi Gagal',
+                text: 'Email Subject dan Email Message wajib diisi!',
                 confirmButtonText: 'OK'
             });
             return;
@@ -2146,40 +2014,18 @@ function applyStandardFixedSignatures(mode) {
 
 @push('styles')
     <style>
-       .pdf-area {
-    position: relative;
-    min-height: 720px;           /* Naikkan tinggi */
-    max-height: 85vh;
-    background: #f8f9fc;
-    border: 2px solid #d1d3e2;
-    border-radius: 12px;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    margin-bottom: 10px;
-}
+        .pdf-area {
+            position: relative;
+            height: 600px;
+            background: #f8f9fc;
+            border: 1px solid #d1d3e2;
+            border-radius: 8px;
+            overflow: hidden; /* 🔥 tetap hidden */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-/* Agar canvas menyesuaikan ukuran area */
-#pdfCanvas {
-    max-width: 100%;
-    max-height: 100%;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-}
-
-/* Scrollable signer panel */
-#dynamicSignerList {
-    max-height: 680px;
-    overflow-y: auto;
-}
-
-/* Responsive adjustment */
-@media (max-width: 992px) {
-    .pdf-area {
-        min-height: 550px;
-    }
-}
 
         .pdf-placeholder {
             position: absolute;
@@ -2190,15 +2036,25 @@ function applyStandardFixedSignatures(mode) {
             color: #aaa;
         }
 
-        .signature-box {
-            position: absolute;
-            padding: 8px 28px 8px 12px;
-            background: rgba(78, 115, 223, 0.1);
-            border: 2px dashed #4e73df;
-            border-radius: 6px;
-            cursor: move;
-            font-size: 13px;
-        }
+.signature-box {
+    position: absolute !important;
+    padding: 10px 30px 10px 15px;
+    background: linear-gradient(135deg, rgba(78,115,223,0.15), rgba(78,115,223,0.08)) !important;
+    border: 2px dashed #4e73df !important;
+    border-radius: 8px !important;
+    cursor: move !important;
+    font-size: 13px !important;
+    z-index: 10 !important;
+    min-width: 140px;
+    user-select: none;
+    transition: box-shadow 0.2s ease;
+}
+
+.signature-box.dragging {
+    z-index: 1000 !important;
+    box-shadow: 0 8px 25px rgba(78,115,223,0.4) !important;
+    transform: rotate(2deg);
+}
 
         .signature-box .delete-signature {
             position: absolute;
@@ -2434,46 +2290,46 @@ function applyStandardFixedSignatures(mode) {
         }
         
         .signer-item {
-    transition: all 0.2s ease;
-    cursor: grab;
-    border-radius: 8px;
-    margin-bottom: 5px;
-}
+            transition: all 0.2s ease;
+            cursor: grab;
+            border-radius: 8px;
+            margin-bottom: 5px;
+        }
 
-.signer-item:hover {
-    background: #f0f4ff;
-    border-left: 3px solid #4e73df;
-}
+        .signer-item:hover {
+            background: #f0f4ff;
+            border-left: 3px solid #4e73df;
+        }
 
-.signer-item.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+        .signer-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-.signature-box {
-    padding: 10px 30px 10px 15px !important;
-    background: linear-gradient(135deg, rgba(78,115,223,0.15), rgba(78,115,223,0.08)) !important;
-    border: 2px dashed #4e73df !important;
-    box-shadow: 0 4px 12px rgba(78,115,223,0.2);
-}
+        .signature-box {
+            padding: 10px 30px 10px 15px !important;
+            background: linear-gradient(135deg, rgba(78,115,223,0.15), rgba(78,115,223,0.08)) !important;
+            border: 2px dashed #4e73df !important;
+            box-shadow: 0 4px 12px rgba(78,115,223,0.2);
+        }
 
-.signature-box .signer-name {
-    font-weight: 600;
-    color: #4e73df;
-    font-size: 13px;
-}
+        .signature-box .signer-name {
+            font-weight: 600;
+            color: #4e73df;
+            font-size: 13px;
+        }
 
-.signature-box .tier-info {
-    color: #858796;
-    font-size: 11px;
-}
+        .signature-box .tier-info {
+            color: #858796;
+            font-size: 11px;
+        }
 
-.cursor-grab {
-    cursor: grab;
-}
+        .cursor-grab {
+            cursor: grab;
+        }
 
-.cursor-grab:active {
-    cursor: grabbing;
-}
+        .cursor-grab:active {
+            cursor: grabbing;
+        }
     </style>
 @endpush

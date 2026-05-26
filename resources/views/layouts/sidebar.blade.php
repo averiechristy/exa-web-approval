@@ -94,7 +94,7 @@
         <div class="sidebar-heading">My Documents</div>
 
         <li class="nav-item {{ request()->routeIs('inbox.*') ? 'active' : '' }}">
-            <a class="nav-link" href="#">
+            <a class="nav-link" href="{{ route('inbox.index') }}">
                 <i class="fas fa-inbox"></i>
                 <span>Inbox</span>
             </a>

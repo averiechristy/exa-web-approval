@@ -30,7 +30,7 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-start mb-4">
                 <div>
-                    <h5 class="mb-1 text-primary">Upload Document</h5>
+                    <h5 class="mb-1 text-primary">Upload Documrnt</h5>
                     <p class="text-muted small mb-0">Upload the PDF document to be processed</p>
                 </div>
                 <div class="text-end">
@@ -166,70 +166,82 @@
         </div>
     </div>
     <!-- STEP 3 -->
-<!-- STEP 3 -->
-<div class="card shadow mb-4 step-content">
-    <div class="card-body">
+    <div class="card shadow mb-4 step-content">
+        <div class="card-body">
 
-        <!-- Signature Placement Type -->
-        <div class="mb-4">
-            <h6 class="font-weight-bold text-primary mb-3">Signature Placement Type</h6>
-            <div class="btn-group btn-group-toggle w-100" data-toggle="buttons">
-                <label class="btn btn-outline-primary active">
-                    <input type="radio" name="placementType" value="custom" checked>
-                    Custom <small class="d-block">Drag & drop manually</small>
-                </label>
-                <label class="btn btn-outline-primary">
-                    <input type="radio" name="placementType" value="standard">
-                    Standard <small class="d-block">Auto bottom right</small>
-                </label>
-                <label class="btn btn-outline-primary">
-                    <input type="radio" name="placementType" value="fixed">
-                    Fixed <small class="d-block">Approval summary page</small>
-                </label>
-            </div>
-        </div>
+            <!-- ================= PLACEMENT TYPE ================= -->
+            <div class="mb-4">
 
-        <div class="row">
-            <!-- SIGNER PANEL (Lebih Kecil) -->
-            <div class="col-md-2">
                 <h6 class="font-weight-bold text-primary mb-3">
-                    <i class="fas fa-user-check mr-2"></i> Approvers (Show on Doc)
+                    Signature Placement Type
                 </h6>
-                <div class="list-group mb-3" id="dynamicSignerList" style="max-height: 650px; overflow-y: auto;">
-                    <!-- Diisi JS -->
+
+                <div class="btn-group btn-group-toggle w-100" data-toggle="buttons">
+
+                    <label class="btn btn-outline-primary active">
+                        <input type="radio" name="placementType" value="custom" checked>
+                        Custom
+                        <small class="d-block">Drag & drop manually</small>
+                    </label>
+
+                    <label class="btn btn-outline-primary">
+                        <input type="radio" name="placementType" value="standard">
+                        Standard
+                        <small class="d-block">Auto place bottom right every page</small>
+                    </label>
+
+                    <label class="btn btn-outline-primary">
+                        <input type="radio" name="placementType" value="fixed">
+                        Fixed
+                        <small class="d-block">Add approval summary page</small>
+                    </label>
+
                 </div>
-                <small class="text-muted">
-                    <i class="fas fa-info-circle mr-1"></i> Drag ke PDF
-                </small>
+
             </div>
 
-            <!-- PDF AREA (Jadi Lebih Besar) -->
-            <div class="col-md-10">
-                <ul class="nav nav-tabs mb-3" id="fileTabs"></ul>
-                
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <button class="btn btn-sm btn-outline-secondary" id="prevPage">
-                        <i class="fas fa-chevron-left"></i> Prev
-                    </button>
-                    <small id="pageInfo" class="text-muted fw-bold">Page 1 of 1</small>
-                    <button class="btn btn-sm btn-outline-secondary" id="nextPage">
-                        Next <i class="fas fa-chevron-right"></i>
-                    </button>
+            <div class="row">
+                <!-- SIGNER PANEL -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold text-primary mb-3">
+                        <i class="fas fa-user-check mr-2"></i>Approvers (Show on Doc)
+                    </h6>
+                    <div class="list-group mb-3" id="dynamicSignerList">
+                        <!-- Diisi dinamis dari Step 2 data -->
+                        <div class="list-group-item text-muted small p-3 text-center">
+                            <i class="fas fa-info-circle"></i> Complete Step 2 first
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle mr-1"></i>Drag approvers to PDF
+                    </small>
+                </div>
+                <!-- PDF AREA -->
+                <div class="col-md-9">
+                    <ul class="nav nav-tabs mb-3" id="fileTabs"></ul>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <button class="btn btn-sm btn-outline-secondary" id="prevPage">
+                            <i class="fas fa-chevron-left"></i> Prev
+                        </button>
+                        <small id="pageInfo" class="text-muted">Page 1</small>
+                        <button class="btn btn-sm btn-outline-secondary" id="nextPage">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div id="pdfArea" class="pdf-area">
+                        <canvas id="pdfCanvas"></canvas>
+                    </div>
                 </div>
 
-                <div id="pdfArea" class="pdf-area">
-                    <canvas id="pdfCanvas"></canvas>
-                </div>
             </div>
-        </div>
 
-        <div class="text-right mt-4">
-            <button class="btn btn-secondary prevBtn">Back</button>
-            <button class="btn btn-primary nextBtn">Next</button>
-        </div>
+            <div class="text-right mt-3">
+                <button class="btn btn-secondary prevBtn">Back</button>
+                <button class="btn btn-primary nextBtn">Next</button>
+            </div>
 
+        </div>
     </div>
-</div>
     <!-- STEP 4  -->
     <div class="card shadow mb-4 step-content">
         <div class="card-body">
@@ -1368,28 +1380,31 @@ function renderPDF(pageNumber = 1) {
         pdfDoc = pdf;
         totalPages = pdf.numPages;
 
-        pdf.getPage(pageNumber).then(page => {
-            const viewport = page.getViewport({ scale: 1.5 }); // Naikkan scale awal
-
-            // Scale agar pas di area besar
-            const containerWidth = pdfArea.clientWidth - 40;
+        pdf.getPage(pageNumber).then(p => {
+            const viewport = p.getViewport({ scale: 1 });
             const scale = Math.min(
-                containerWidth / viewport.width,
-                1.8  // batas maksimal zoom
+                pdfArea.clientWidth / viewport.width,
+                pdfArea.clientHeight / viewport.height
             );
+            const scaled = p.getViewport({ scale });
 
-            const scaledViewport = page.getViewport({ scale });
-
-            pdfCanvas.width = scaledViewport.width;
-            pdfCanvas.height = scaledViewport.height;
+            pdfCanvas.width = scaled.width;
+            pdfCanvas.height = scaled.height;
 
             ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
 
-            page.render({
+            if (renderTask) {
+                renderTask.cancel();
+            }
+
+            renderTask = p.render({
                 canvasContext: ctx,
-                viewport: scaledViewport
-            }).promise.then(() => {
+                viewport: scaled
+            });
+
+            renderTask.promise.then(() => {
                 $('#pageInfo').text(`Page ${currentPage} of ${totalPages}`);
+                // 🔥 AUTO RENDER SIGNATURES SETELAH PDF RENDER
                 renderSignaturesForPage(currentPage);
             });
         });
@@ -2146,40 +2161,18 @@ function applyStandardFixedSignatures(mode) {
 
 @push('styles')
     <style>
-       .pdf-area {
-    position: relative;
-    min-height: 720px;           /* Naikkan tinggi */
-    max-height: 85vh;
-    background: #f8f9fc;
-    border: 2px solid #d1d3e2;
-    border-radius: 12px;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    margin-bottom: 10px;
-}
+        .pdf-area {
+            position: relative;
+            height: 600px;
+            background: #f8f9fc;
+            border: 1px solid #d1d3e2;
+            border-radius: 8px;
+            overflow: hidden; /* 🔥 tetap hidden */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-/* Agar canvas menyesuaikan ukuran area */
-#pdfCanvas {
-    max-width: 100%;
-    max-height: 100%;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-}
-
-/* Scrollable signer panel */
-#dynamicSignerList {
-    max-height: 680px;
-    overflow-y: auto;
-}
-
-/* Responsive adjustment */
-@media (max-width: 992px) {
-    .pdf-area {
-        min-height: 550px;
-    }
-}
 
         .pdf-placeholder {
             position: absolute;

@@ -57,13 +57,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/store', [UploadController::class, 'store'])->name('documents.store');
     
 // Inbox
-Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
+Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
+Route::get('/inbox/{folder}', [InboxController::class, 'showFolder'])->name('inbox.show');
+Route::get('/inbox/documents/{document}/preview', [InboxController::class, 'preview'])
+    ->name('inbox.preview');
 
-// Folder Document
-Route::get('documents/folder/{folder}', [InboxController::class, 'showFolder'])
-     ->name('documents.folder');     
-
-
+    Route::post('/documents/{document}/approve', [InboxController::class, 'approve'])
+     ->name('document.approve');
      // ===== ROUTES UNTUK DOCUMENT =====
 
 Route::prefix('documents')->name('documents.')->group(function () {

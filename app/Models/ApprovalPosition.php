@@ -15,7 +15,8 @@ class ApprovalPosition extends Model
         'document_approval_id',
         'page_number',
         'pos_x_percent',
-        'pos_y_percent'
+        'pos_y_percent',
+        'mode'
     ];
 
     public function documentapproval()

@@ -22,7 +22,8 @@ class Documents extends Model
         'workflow_id',
         'current_tier',
         'email_subject',
-        'email_message'
+        'email_message',
+        'flag_open'
     ];
 
     public function organization()

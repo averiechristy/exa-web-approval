@@ -19,7 +19,7 @@ class UserRequest extends FormRequest
             'name' => [
                 'required',
                 'string',
-                'max:100'
+                'max:25'
             ],
 
             'email' => [

@@ -11,7 +11,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use setasign\Fpdi\Tcpdf\Fpdi;
 use Storage;
 
-class InboxController extends Controller
+class InboxControllerBackup extends Controller
 {
     /**
      * Display a listing of the resource.

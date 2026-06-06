@@ -308,6 +308,7 @@ class UploadController extends Controller
 
                 // Mapping temp_id => real approval id
                 $approvalIdsMap = [];
+                $requesterApproval = null;
 
                 // Create Document Approvals + Kirim Email
                 foreach ($payload['document_approvals'] as $app) {

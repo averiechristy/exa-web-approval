@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\DocumentApprovalMail;
 use App\Models\ApprovalPosition;
 use App\Models\DocumentApproval;
 use App\Models\Documents;
 use App\Models\Folder;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Mail;
 use setasign\Fpdi\Tcpdf\Fpdi;
 use Storage;
 
@@ -218,88 +221,17 @@ public function preview($id)
     ]);
 
     return view('inbox.preview', compact('document', 'folder'));
-}
-// public function approve(Request $request, $id)
-// {
-//     $document = Documents::findOrFail($id);
-
-//     if ($document->status !== 'IN_PROGRESS') {
-//         return response()->json([
-//             'success' => false, 
-//             'message' => 'Document cannot be approved in current status.'
-//         ], 400);
-//     }
-
-//     $approver = auth()->user();
-//     $approvalTime = now()->format('d M Y H:i');
-
-//     $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
-
-//     $originalPath = storage_path('app/public/' . $document->path);
-//     $newFilename = time() . '_' . basename($document->path);
-//     $newPath = 'documents/approved/' . $newFilename;
-//     $newFullPath = storage_path('app/public/' . $newPath);
-
-//     // Buat direktori jika belum ada
-//     Storage::disk('public')->makeDirectory('documents/approved');
-
-//     try {
-//         $pdf = new Fpdi();
-
-//         // Penting: Set font path untuk TCPDF
-//         $pdf->setFontSubsetting(true);
-        
-//         $pageCount = $pdf->setSourceFile($originalPath);
-
-//         for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
-//             $pdf->AddPage();
-//             $tplId = $pdf->importPage($pageNo);
-//             $pdf->useTemplate($tplId, 0, 0, null, null, true);
-
-//             // === Tambahkan Teks Approval ===
-//             $pdf->SetFont('helvetica', 'B', 12);
-//             $pdf->SetTextColor(0, 128, 0); // Green
-
-//             // Sesuaikan posisi ini sesuai kebutuhan PDF Anda
-//             // X = 120mm, Y = 240mm (bottom area)
-//             $pdf->SetXY(120, 240);
-//             $pdf->Cell(80, 10, $textToInsert, 0, 1, 'L');
-//         }
-
-//         $pdf->Output($newFullPath, 'F');
-
-//         // Update database
-//         $document->update([
-//             'path'         => $newPath,
-//             'status'       => 'APPROVED',
-//             'approved_by'  => $approver->id,
-//             'approved_at'  => now(),
-//         ]);
-
-//         return response()->json([
-//             'success' => true,
-//             'message' => 'Document approved and signed successfully.'
-//         ]);
-
-//     } catch (\Exception $e) {
-//         \Log::error('PDF Approval Error: ' . $e->getMessage());
-        
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Failed to process PDF: ' . $e->getMessage()
-//         ], 500);
-//     }
-// }
-
-
+}/**
+ * Approve document by current approver
+ */
 public function approve(Request $request, $id)
 {
     $document = Documents::findOrFail($id);
 
-    if ($document->status == 'APPROVED') {
+    if ($document->status === 'APPROVED') {
         return response()->json([
-            'success' => false, 
-            'message' => 'Document cannot be approved in current status.'
+            'success' => false,
+            'message' => 'Document has already been fully approved.'
         ], 400);
     }
 
@@ -307,7 +239,7 @@ public function approve(Request $request, $id)
     $approvalTime = now()->format('d M Y H:i');
     $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
 
-    // === Ambil data approval record ===
+    // Ambil approval record
     $documentApproval = DocumentApproval::where('document_id', $id)
         ->where('approver_id', $approver->id)
         ->first();
@@ -315,21 +247,24 @@ public function approve(Request $request, $id)
     if (!$documentApproval) {
         return response()->json([
             'success' => false,
-            'message' => 'Approval record not found or already processed.'
+            'message' => 'Approval record not found or you are not authorized.'
         ], 404);
     }
 
-    // === CEK: Apakah perlu tampilkan di PDF? ===
-    $showOnDoc = $documentApproval->show_on_doc ?? true;
+    if ($documentApproval->status !== 'PENDING') {
+        return response()->json([
+            'success' => false,
+            'message' => 'This approval has already been processed.'
+        ], 400);
+    }
 
-    // === Ambil posisi ===
-    $positions = ApprovalPosition::where('document_approval_id', $documentApproval->id)
-        ->get();
+    $showOnDoc = $documentApproval->show_on_doc ?? true;
+    $positions = ApprovalPosition::where('document_approval_id', $documentApproval->id)->get();
 
     if ($positions->isEmpty() && $showOnDoc) {
         return response()->json([
             'success' => false,
-            'message' => 'Approval position not configured.'
+            'message' => 'Approval position not configured for this document.'
         ], 400);
     }
 
@@ -338,103 +273,53 @@ public function approve(Request $request, $id)
     $newPath = 'documents/approved/' . $newFilename;
     $newFullPath = storage_path('app/public/' . $newPath);
 
-    Storage::disk('public')->makeDirectory('documents/approved');
+    Storage::disk('public')->makeDirectory('documents/approved', 0755, true);
 
     try {
-       $pdf = new Fpdi();
+        $pdf = new Fpdi();
+        $pdf->setFontSubsetting(true);
+        $pageCount = $pdf->setSourceFile($originalPath);
 
-    $pdf->setFontSubsetting(true);
-    $pageCount = $pdf->setSourceFile($originalPath);
+        for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+            $pdf->AddPage();
+            $tplId = $pdf->importPage($pageNo);
+            $pdf->useTemplate($tplId, 0, 0, null, null, true);
 
-    for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
-        $pdf->AddPage();
-        $tplId = $pdf->importPage($pageNo);
-        $pdf->useTemplate($tplId, 0, 0, null, null, true);
+            if (!$showOnDoc) continue;
 
-        if (!$showOnDoc) {
-            continue;
-        }
+            $size = $pdf->getTemplateSize($tplId);
+            $pageWidth = $size['width'];
+            $pageHeight = $size['height'];
 
-        $size = $pdf->getTemplateSize($tplId);
-        $pageWidth  = $size['width'];
-        $pageHeight = $size['height'];
-
-        // === Cari posisi paling bawah di halaman ini ===
-        $bottomPosition = $positions->where('page_number', $pageNo)
-            ->sortByDesc('pos_y_percent')
-            ->first();
-
-     // Di dalam loop page
             foreach ($positions as $pos) {
                 if ((int)$pos->page_number !== $pageNo) continue;
 
-               
-                    $textWidth = $pdf->GetStringWidth($textToInsert);
-                    // ✅ Tanpa padding - langsung gunakan lebar teks asli
-                    $x = ($pos->pos_x_percent / 100) * $pageWidth;
-                    $y = ($pos->pos_y_percent / 100) * $pageHeight;
-                    
-                    $pdf->SetFont('helvetica', 'B', 11);
-                    $pdf->SetTextColor(0, 128, 0);
+              $x = $pos->pos_x_percent * $pageWidth;
+$y = $pos->pos_y_percent * $pageHeight;
+
+$pdf->SetFont('helvetica', 'B', 11);
+$pdf->SetTextColor(0, 128, 0);
 
 $pdf->SetXY($x, $y);
 $pdf->Write(0, $textToInsert);
-                    
-              
-                // // STANDARD/FIXED: Pakai logic lama (dengan margin)
-                // $x = ($pos->pos_x_percent / 100) * $pageWidth;
-                // $y = ($pos->pos_y_percent / 100) * $pageHeight;
-
-                // $pdf->SetFont('helvetica', 'B', 11);
-                // $pdf->SetTextColor(0, 128, 0);
-
-                // $textWidth = $pdf->GetStringWidth($textToInsert);
-
-                // // === MODIFIKASI KHUSUS POSISI PALING BAWAH ===
-                // if ($bottomPosition && $pos->id === $bottomPosition->id) {
-                //     if ($pos->pos_x_percent >= 50) {
-                //         $marginX = -55;
-                //     } else {
-                //         $marginX = 8;
-                //     }
-                //     $marginY = 18;
-                // } else {
-                //     if ($pos->pos_x_percent >= 50) {
-                //         $marginX = -55;
-                //     } else {
-                //         $marginX = 8;
-                //     }
-                // }
-
-                // $finalX = $x + $marginX;
-                // $finalY = $y - $marginY;
-
-                // $pdf->SetXY($finalX, $finalY);
-                // $align = ($pos->pos_x_percent >= 50) ? 'R' : 'L';
-
-                // $pdf->Cell($textWidth + 10, 8, $textToInsert, 0, 1, $align);
             }
         }
 
         $pdf->Output($newFullPath, 'F');
 
         // === UPDATE APPROVAL RECORD ===
-        // === UPDATE APPROVAL RECORD (dengan is_overdue) ===
         $now = now();
-
-        $isOverdue = false;
-        if ($documentApproval->due_at && $now->gt($documentApproval->due_at)) {
-            $isOverdue = true;
-        }
+        $isOverdue = $documentApproval->due_at && $now->gt($documentApproval->due_at);
 
         $documentApproval->update([
             'status'        => 'APPROVED',
             'completed_at'  => $now,
-            'is_overdue'    => $isOverdue,     // ← TAMBAHKAN INI
+            'is_overdue'    => $isOverdue,
         ]);
 
-        // === CEK: Apakah perlu update tier? ===
+        // === HITUNG TIER PROGRESS ===
         $currentTier = $document->current_tier;
+
         $tierApprovals = DocumentApproval::where('document_id', $id)
             ->where('tier', $currentTier)
             ->get();
@@ -442,11 +327,10 @@ $pdf->Write(0, $textToInsert);
         $approvedInTier = $tierApprovals->where('status', 'APPROVED')->count();
         $totalInTier = $tierApprovals->count();
 
-        // Jika semua approver di tier ini sudah approve, naikkan tier
         $shouldAdvanceTier = ($approvedInTier === $totalInTier);
         $newTier = $shouldAdvanceTier ? $currentTier + 1 : $currentTier;
 
-        // === CEK: Apakah semua approver sudah selesai? ===
+        // === CEK STATUS DOKUMEN ===
         $allApprovals = DocumentApproval::where('document_id', $id)->get();
         $totalApprovers = $allApprovals->count();
         $approvedCount = $allApprovals->where('status', 'APPROVED')->count();
@@ -454,247 +338,88 @@ $pdf->Write(0, $textToInsert);
         $documentStatus = 'PARTIALLY APPROVED';
         if ($approvedCount === $totalApprovers) {
             $documentStatus = 'APPROVED';
-        } elseif ($shouldAdvanceTier) {
-            $documentStatus = 'PARTIALLY APPROVED'; // Jadi pending untuk tier berikutnya
         }
 
         // === UPDATE DOCUMENT ===
         $document->update([
-            'path'          => $newPath,
-            'status'        => $documentStatus,
+            'path'         => $newPath,
+            'status'       => $documentStatus,
             'approved_by'  => $approver->id,
-            'current_tier' => $newTier, // <-- UPDATE CURRENT_TIER
+            'current_tier' => $newTier,
         ]);
 
-        // === RESPONSE ===
-        $remainingApprovers = $totalApprovers - $approvedCount;
+        // ==================== REKOMENDASI: KIRIM EMAIL KE TIER BERIKUTNYA ====================
+        $this->notifyNextApprover($document);
 
+        // === RESPONSE ===
         if ($documentStatus === 'APPROVED') {
             return response()->json([
                 'success' => true,
-                'message' => 'Document fully approved by all approvers.',
-                'show_on_doc' => $showOnDoc
+                'message' => 'Document has been fully approved by all approvers.',
+                'status'  => $documentStatus
             ]);
         } elseif ($shouldAdvanceTier) {
             return response()->json([
                 'success' => true,
-                'message' => "Approved. Moving to Tier {$newTier}.",
-                'show_on_doc' => $showOnDoc
+                'message' => "Approved successfully. Moving to Tier {$newTier}.",
+                'next_tier' => $newTier,
+                'status'  => $documentStatus
             ]);
         } else {
             return response()->json([
                 'success' => true,
-                'message' => "Approved ({$approvedInTier}/{$totalInTier}) - Waiting for " . ($totalInTier - $approvedInTier) . " more approver(s).",
-                'show_on_doc' => $showOnDoc
+                'message' => "Approved ({$approvedInTier}/{$totalInTier}) - Waiting for remaining approvers.",
+                'status'  => $documentStatus
             ]);
         }
 
     } catch (\Exception $e) {
-        \Log::error('PDF Approval Error: ' . $e->getMessage());
+        \Log::error('PDF Approval Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine());
         
         return response()->json([
             'success' => false,
-            'message' => 'Failed to process PDF: ' . $e->getMessage()
+            'message' => 'Failed to process document approval: ' . $e->getMessage()
         ], 500);
     }
 }
 
+/**
+ * Notify all approvers in the next tier
+ */
+/**
+ * Kirim email hanya ke approver berikutnya berdasarkan approver_order
+ */
+private function notifyNextApprover($document)
+{
+    $currentTier = $document->current_tier;
 
-// public function approve(Request $request, $id)
-// {
-//     $document = Documents::findOrFail($id);
-//     if ($document->status == 'APPROVED') {
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Document cannot be approved in current status.'
-//         ], 400);
-//     }
+    // Ambil semua approval yang masih PENDING, diurutkan per tier lalu per order
+    $pendingApprovals = DocumentApproval::where('document_id', $document->id)
+        ->where('status', 'PENDING')
+        ->orderBy('tier')
+        ->orderBy('approver_order')   // Sesuai contoh kamu
+        ->get();
 
-//     $approver = auth()->user();
-//     $approvalTime = now()->format('d M Y H:i');
-//     $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
+    // Ambil approver pertama yang masih pending (ini adalah "next approver")
+    $nextApproval = $pendingApprovals->first();
 
-//     // === Ambil data approval record ===
-//     $documentApproval = DocumentApproval::where('document_id', $id)
-//         ->where('approver_id', $approver->id)
-//         ->first();
+    if (!$nextApproval) {
+        return; // Semua sudah approve
+    }
 
-//     if (!$documentApproval) {
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Approval record not found or already processed.'
-//         ], 404);
-//     }
+    $approverUser = User::find($nextApproval->approver_id);
 
-//     // === CEK: Apakah perlu tampilkan di PDF? ===
-//     $showOnDoc = $documentApproval->show_on_doc ?? true;
+    if ($approverUser && $approverUser->email) {
+        try {
+            Mail::to($approverUser->email)
+                ->send(new DocumentApprovalMail($document, $nextApproval));
 
-//     // === Ambil posisi ===
-//     $positions = ApprovalPosition::where('document_approval_id', $documentApproval->id)
-//         ->get();
-
-//     if ($positions->isEmpty() && $showOnDoc) {
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Approval position not configured.'
-//         ], 400);
-//     }
-
-//     $originalPath = storage_path('app/public/' . $document->path);
-//     $newFilename = time() . '_' . basename($document->path);
-//     $newPath = 'documents/approved/' . $newFilename;
-//     $newFullPath = storage_path('app/public/' . $newPath);
-
-//     Storage::disk('public')->makeDirectory('documents/approved');
-
-//     try {
-//         $pdf = new Fpdi();
-//         $pdf->setFontSubsetting(true);
-//         $pageCount = $pdf->setSourceFile($originalPath);
-
-//         for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
-//             $pdf->AddPage();
-//             $tplId = $pdf->importPage($pageNo);
-//             $pdf->useTemplate($tplId, 0, 0, null, null, true);
-
-//             if (!$showOnDoc) {
-//                 continue;
-//             }
-
-//             $size = $pdf->getTemplateSize($tplId);
-//             $pageWidth = $size['width'];
-//             $pageHeight = $size['height'];
-
-//             // === Cari posisi paling bawah di halaman ini ===
-//             $bottomPosition = $positions->where('page_number', $pageNo)
-//                 ->sortByDesc('pos_y_percent')
-//                 ->first();
-
-//             foreach ($positions as $pos) {
-//                 if ((int)$pos->page_number !== $pageNo) continue;
-
-//                 $x = ($pos->pos_x_percent / 100) * $pageWidth;
-//                 $y = ($pos->pos_y_percent / 100) * $pageHeight;
-
-//                 // === Tentukan Alignment (Rata Kanan / Kiri) ===
-//                 $align = ($pos->pos_x_percent >= 50) ? 'R' : 'L';
-
-//                 // === Tentukan Margin X dan Y ===
-//                 if ($bottomPosition && $pos->id === $bottomPosition->id) {
-//                     // Posisi PALING BAWAH
-//                     if ($pos->pos_x_percent >= 50) {
-//                         $marginX = -15;   // Rata kanan
-//                         $marginY = 22;
-//                     } else {
-//                         $marginX = 8;     // Rata kiri
-//                         $marginY = 15;
-//                     }
-//                 } else {
-//                     // Posisi Biasa
-//                     if ($pos->pos_x_percent >= 50) {
-//                         $marginX = -15;   // Rata kanan
-//                         $marginY = 12;
-//                     } else {
-//                         $marginX = 8;     // Rata kiri
-//                         $marginY = 12;
-//                     }
-//                 }
-
-//                 $finalX = $x + $marginX;
-//                 $finalY = $y - $marginY;
-
-//                 // === Set Font & Warna ===
-//                 $pdf->SetFont('helvetica', 'B', 11);
-//                 $pdf->SetTextColor(0, 128, 0);
-
-//                 $textWidth = $pdf->GetStringWidth($textToInsert);
-
-//                 // === Tulis teks dengan alignment yang sesuai ===
-//                 if ($align === 'R') {
-//                     // Rata Kanan: geser X ke kiri sesuai panjang teks
-//                     $pdf->SetXY($finalX - $textWidth - 5, $finalY);
-//                     $pdf->Cell($textWidth + 10, 8, $textToInsert, 0, 1, 'R');
-//                 } else {
-//                     // Rata Kiri
-//                     $pdf->SetXY($finalX, $finalY);
-//                     $pdf->Cell($textWidth + 10, 8, $textToInsert, 0, 1, 'L');
-//                 }
-//             }
-//         }
-
-//         $pdf->Output($newFullPath, 'F');
-
-//         // === UPDATE APPROVAL RECORD ===
-//         $now = now();
-//         $isOverdue = false;
-//         if ($documentApproval->due_at && $now->gt($documentApproval->due_at)) {
-//             $isOverdue = true;
-//         }
-
-//         $documentApproval->update([
-//             'status' => 'APPROVED',
-//             'completed_at' => $now,
-//             'is_overdue' => $isOverdue,
-//         ]);
-
-//         // === CEK TIER & STATUS DOKUMEN ===
-//         $currentTier = $document->current_tier;
-//         $tierApprovals = DocumentApproval::where('document_id', $id)
-//             ->where('tier', $currentTier)
-//             ->get();
-
-//         $approvedInTier = $tierApprovals->where('status', 'APPROVED')->count();
-//         $totalInTier = $tierApprovals->count();
-//         $shouldAdvanceTier = ($approvedInTier === $totalInTier);
-//         $newTier = $shouldAdvanceTier ? $currentTier + 1 : $currentTier;
-
-//         $allApprovals = DocumentApproval::where('document_id', $id)->get();
-//         $totalApprovers = $allApprovals->count();
-//         $approvedCount = $allApprovals->where('status', 'APPROVED')->count();
-
-//         $documentStatus = 'PARTIALLY APPROVED';
-//         if ($approvedCount === $totalApprovers) {
-//             $documentStatus = 'APPROVED';
-//         }
-
-//         // === UPDATE DOCUMENT ===
-//         $document->update([
-//             'path' => $newPath,
-//             'status' => $documentStatus,
-//             'approved_by' => $approver->id,
-//             'current_tier' => $newTier,
-//         ]);
-
-//         // === RESPONSE ===
-//         if ($documentStatus === 'APPROVED') {
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => 'Document fully approved by all approvers.',
-//                 'show_on_doc' => $showOnDoc
-//             ]);
-//         } elseif ($shouldAdvanceTier) {
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => "Approved. Moving to Tier {$newTier}.",
-//                 'show_on_doc' => $showOnDoc
-//             ]);
-//         } else {
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => "Approved ({$approvedInTier}/{$totalInTier}) - Waiting for " . ($totalInTier - $approvedInTier) . " more approver(s).",
-//                 'show_on_doc' => $showOnDoc
-//             ]);
-//         }
-
-//     } catch (\Exception $e) {
-//         \Log::error('PDF Approval Error: ' . $e->getMessage());
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Failed to process PDF: ' . $e->getMessage()
-//         ], 500);
-//     }
-// }
-
+            \Log::info("Notifikasi approval dikirim ke: {$approverUser->email} | Tier: {$nextApproval->tier} | Order: {$nextApproval->approver_order}");
+        } catch (\Exception $e) {
+            \Log::error("Gagal kirim email ke {$approverUser->email}: " . $e->getMessage());
+        }
+    }
+}
 /**
  * Generate full breadcrumb path
  */

@@ -354,74 +354,146 @@
     }
 
     // ================= DYNAMIC SIGNER LIST FROM STEP 2 =================
-    function renderSignerListFromStep2() {
-        const step2Data = collectStep2Data();
-        const showOnDocSigners = [];
-        
-        // Kumpulkan semua approver yang "Show on document"
-        step2Data.approvers.forEach(tier => {
-            tier.approvers.forEach(approver => {
-                if (approver.show_on_document) {
-                    // Ambil nama dari option text atau fallback
-                    const tierBox = $(`.tier-box[data-tier="${tier.tier}"]`);
-                    const select = tierBox.find('.approver-select').filter(function() {
-                        return $(this).val() == approver.user_id;
-                    });
-                    
-                    let approverName = 'Unknown User';
-                    if (select.length > 0) {
-                        approverName = select.find('option:selected').text() || select.find(`option[value="${approver.user_id}"]`).text();
-                    }
-                    
-                    showOnDocSigners.push({
-                        id: approver.user_id,
-                        name: approverName,
-                        tier: tier.tier,
-                        division_id: approver.division_id
-                    });
-                }
-            });
+ function renderSignerListFromStep2() {
+    const step2Data = collectStep2Data();
+    const showOnDocSigners = [];
+    
+    step2Data.approvers.forEach(tier => {
+        tier.approvers.forEach(approver => {
+            if (approver.show_on_document) {
+                const tierBox = $(`.tier-box[data-tier="${tier.tier}"]`);
+                const select = tierBox.find('.approver-select').filter(function() {
+                    return $(this).val() == approver.user_id;
+                });
+                
+                let approverName = select.length > 0 
+                    ? select.find('option:selected').text() 
+                    : approver.name || 'Unknown User';
+
+                showOnDocSigners.push({
+                    id: approver.user_id,
+                    name: approverName,
+                    tier: tier.tier,
+                    division_id: approver.division_id
+                });
+            }
         });
-        
-        // Render signer list
-        const signerList = document.getElementById('dynamicSignerList');
-        if (showOnDocSigners.length === 0) {
-            signerList.innerHTML = `
-                <div class="list-group-item text-muted small p-3 text-center">
-                    <i class="fas fa-info-circle"></i> No approvers selected for document
-                </div>
-            `;
-            return [];
-        }
-        
-        signerList.innerHTML = '';
-        showOnDocSigners.forEach(signer => {
-            const item = document.createElement('div');
-            item.className = 'list-group-item signer-item px-3 py-2';
-            item.draggable = true;
-            item.dataset.signerId = signer.id;
-            item.dataset.signerName = signer.name;
-            item.dataset.tier = signer.tier;
-            item.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-user text-primary mr-2"></i>
-                    <div>
-                        <div class="font-weight-medium" style="font-size: 13px;">${signer.name}</div>
-                        <small class="text-muted">Tier ${signer.tier}</small>
-                    </div>
-                    <i class="fas fa-grip-vertical text-muted ml-auto cursor-grab" style="font-size: 12px;"></i>
-                </div>
-            `;
-            signerList.appendChild(item);
-        });
-        
-        // Attach drag events
-        document.querySelectorAll('#dynamicSignerList .signer-item').forEach(item => {
-            item.addEventListener('dragstart', handleSignerDragStart);
-        });
-        
-        return showOnDocSigners;
+    });
+
+    const signerList = document.getElementById('dynamicSignerList');
+    signerList.innerHTML = '';
+
+    if (showOnDocSigners.length === 0) {
+        signerList.innerHTML = `
+            <div class="list-group-item text-muted small p-3 text-center">
+                <i class="fas fa-info-circle"></i> No approvers selected for document
+            </div>`;
+        return;
     }
+
+    showOnDocSigners.forEach(signer => {
+        const item = document.createElement('div');
+        item.className = 'list-group-item signer-item px-3 py-2';
+        item.style.cursor = 'pointer';
+        item.title = 'Klik untuk menempatkan di PDF';
+        
+        item.dataset.signerId = signer.id;
+        item.dataset.signerName = signer.name;
+        item.dataset.tier = signer.tier;
+
+        item.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas fa-user text-primary mr-2"></i>
+                <div class="flex-grow-1">
+                    <div class="font-weight-medium" style="font-size: 13px;">${signer.name}</div>
+                    <small class="text-muted">Tier ${signer.tier}</small>
+                </div>
+            </div>
+        `;
+
+        // === CLICK TO PLACE ===
+        item.addEventListener('click', () => handleSignerClick(signer));
+
+        signerList.appendChild(item);
+    });
+}
+
+function handleSignerClick(signer) {
+    const currentFile = uploadedFiles[activeFileIndex];
+    if (!currentFile) {
+        Swal.fire('Error', 'No file selected', 'error');
+        return;
+    }
+
+    // Cek apakah sudah ada di halaman ini
+    const alreadyOnThisPage = currentFile.signatures.some(
+        sig => sig.signer_id == signer.id && sig.page === currentPage
+    );
+
+    if (alreadyOnThisPage) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Already Placed',
+            text: `Approver ini sudah ditempatkan di halaman ${currentPage}`,
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+
+    // Default position (bisa diubah)
+    const defaultXPercent = 78;   // agak kanan
+    const defaultYPercent = 65;   // agak bawah
+
+    const xPx = (defaultXPercent / 100) * pdfCanvas.width;
+    const yPx = (defaultYPercent / 100) * pdfCanvas.height;
+
+    const signatureData = {
+        signer_id: signer.id,
+        signer_name: signer.name,
+        tier: parseInt(signer.tier || 1),
+        page: currentPage,
+        x_percent: defaultXPercent,
+        y_percent: defaultYPercent,
+        pos_x: Math.round(xPx),
+        pos_y: Math.round(yPx)
+    };
+
+    currentFile.signatures.push(signatureData);
+
+    // Buat visual box
+    const box = document.createElement('div');
+    box.className = 'signature-box';
+    box.dataset.signerId = signer.id;
+    box.dataset.signerName = signer.name;
+    box.dataset.page = currentPage;
+    box.dataset.x = defaultXPercent;
+    box.dataset.y = defaultYPercent;
+    box.dataset.tier = signer.tier || 1;
+    box.dataset.fileIndex = activeFileIndex;
+
+    box.innerHTML = `
+        <div class="delete-signature">×</div>
+        <div class="signature-text">
+            <span class="approved-by">Approved by</span>
+            <span class="approver-name">${signer.name}</span>
+            <span class="at">at</span>
+            <span class="datetime">${new Date().toLocaleString('id-ID', { 
+                day: '2-digit', month: 'short', year: 'numeric', 
+                hour: '2-digit', minute: '2-digit' 
+            }).replace(',', '')}</span>
+        </div>
+        <div class="resize-handle"></div>
+    `;
+
+    positionSignatureBoxAtCanvas(box, xPx, yPx);
+    makeSignatureBoxDraggable(box);   // tetap bisa di-drag
+    pdfArea.appendChild(box);
+makeResizable(box);
+    updateSignerUIForCurrentFile();
+
+    // Optional: feedback
+    // box.style.animation = 'pulse 0.6s';
+}
 
     // Drag handler untuk dynamic signers
    // ================= DRAG & DROP - CANVAS AREA ONLY =================
@@ -456,6 +528,7 @@ pdfCanvas.addEventListener('dragleave', function () {
 // DROP di CANVAS saja
 // Drop di CANVAS saja
 pdfCanvas.addEventListener('drop', function (e) {
+    console.log('DROP TRIGGERED');
     e.preventDefault();
     pdfCanvas.style.cursor = 'default';
 
@@ -496,8 +569,8 @@ const canvasRect = pdfCanvas.getBoundingClientRect();
     const boxHeight = 60;
 
     // Center box di cursor
-    // xPx = xPx - (boxWidth / 2);
-    // yPx = yPx - (boxHeight / 2) + 10;
+    xPx = xPx - (boxWidth / 2);
+    yPx = yPx - (boxHeight / 2) + 10;
 
     // 🔥 BUFFER DI SEMUA SISI
     const bufferLeft = 10;
@@ -507,18 +580,16 @@ const canvasRect = pdfCanvas.getBoundingClientRect();
 
     xPx = Math.max(bufferLeft, Math.min(xPx, canvasRect.width - boxWidth - bufferRight));
     yPx = Math.max(bufferTop, Math.min(yPx, canvasRect.height - boxHeight - bufferBottom));
-
-    const xPercent = xPx / canvasRect.width;
-const yPercent = yPx / canvasRect.height;
-
-console.log('NEW X PERCENT', xPercent);
-
     console.log({
     canvasWidth: canvasRect.width,
     canvasHeight: canvasRect.height,
     xPx,
     yPx
 });
+
+    const xPercent = Math.round((xPx / canvasRect.width) * 100);
+    const yPercent = Math.round((yPx / canvasRect.height) * 100);
+
     console.log(`📍 Drop di Canvas Page ${currentPage}: x=${xPercent}%, y=${yPercent}%`);
 
     // Simpan data signature dengan page yang benar
@@ -560,10 +631,12 @@ box.innerHTML = `
             hour: '2-digit', minute: '2-digit' 
         }).replace(',', '')}</span>
     </div>
+    <div class="resize-handle"></div>
 `;
 
     positionSignatureBoxAtCanvas(box, xPx, yPx);
     makeSignatureBoxDraggable(box);
+    makeResizable(box);
     
     pdfArea.appendChild(box);
 
@@ -572,13 +645,11 @@ box.innerHTML = `
     draggedSigner = null;
 });
 // ===== POSITION BOX RELATIVE TO CANVAS =====
+// ===== POSITION BOX RELATIVE TO CANVAS =====
 function positionSignatureBoxAtCanvas(box, xPx, yPx) {
-    // Cari offset dari pdfArea
-    const pdfArea = document.getElementById('pdfArea');
     const pdfAreaRect = pdfArea.getBoundingClientRect();
     const canvasRect = pdfCanvas.getBoundingClientRect();
 
-    // Offset untuk positioning di dalam pdfArea
     box.style.position = 'absolute';
     box.style.left = (canvasRect.left - pdfAreaRect.left + xPx) + 'px';
     box.style.top = (canvasRect.top - pdfAreaRect.top + yPx) + 'px';
@@ -588,8 +659,7 @@ function positionSignatureBoxAtCanvas(box, xPx, yPx) {
 // ===== MAKE SIGNATURE BOX DRAGGABLE =====
 function makeSignatureBoxDraggable(box) {
     let isDragging = false;
-    let startX, startY;
-    let originalLeft, originalTop;
+    let startX, startY, originalLeft, originalTop;
 
     box.addEventListener('pointerdown', function (e) {
         if (e.target.classList.contains('delete-signature')) return;
@@ -597,12 +667,11 @@ function makeSignatureBoxDraggable(box) {
         isDragging = true;
         startX = e.clientX;
         startY = e.clientY;
-        
         originalLeft = parseFloat(box.style.left) || 0;
         originalTop = parseFloat(box.style.top) || 0;
-        
-        box.setPointerCapture(e.pointerId);
+
         box.style.cursor = 'grabbing';
+        box.setPointerCapture(e.pointerId);
     });
 
     box.addEventListener('pointermove', function (e) {
@@ -620,35 +689,26 @@ function makeSignatureBoxDraggable(box) {
         const minX = canvasRect.left - pdfAreaRect.left;
         const minY = canvasRect.top - pdfAreaRect.top;
 
-        // 🔥 BUFFER DI SEMUA SISI SAAT DRAG
-        const bufferLeft = 10;
-        const bufferRight = 10;
-        const bufferTop = 10;
-        const bufferBottom = 60;
+        const maxX = minX + canvasRect.width - box.offsetWidth - 10;
+        const maxY = minY + canvasRect.height - box.offsetHeight - 60;
 
-        const maxX = minX + canvasRect.width - box.offsetWidth - bufferRight;
-        const maxY = minY + canvasRect.height - box.offsetHeight - bufferBottom;
-
-        newLeft = Math.max(minX + bufferLeft, Math.min(newLeft, maxX));
-        newTop = Math.max(minY + bufferTop, Math.min(newTop, maxY));
+        newLeft = Math.max(minX + 10, Math.min(newLeft, maxX));
+        newTop = Math.max(minY + 10, Math.min(newTop, maxY));
 
         box.style.left = newLeft + 'px';
         box.style.top = newTop + 'px';
 
-        // Update percentage
-     const xPercent = (newLeft - minX) / canvasRect.width;
-const yPercent = (newTop - minY) / canvasRect.height;
+        // Update data
+        const xPercent = Math.round(((newLeft - minX) / canvasRect.width) * 100);
+        const yPercent = Math.round(((newTop - minY) / canvasRect.height) * 100);
+        // Setelah update data signatures...
+box.dataset.x = xPercent;
+box.dataset.y = yPercent;
 
-console.log('DRAG X%', xPercent);
-        
-        const fileIndex = parseInt(box.dataset.fileIndex || activeFileIndex);
-        const signerId = box.dataset.signerId;
-        const page = parseInt(box.dataset.page);
-
-        const file = uploadedFiles[fileIndex];
+        const file = uploadedFiles[parseInt(box.dataset.fileIndex || activeFileIndex)];
         if (file) {
             file.signatures = file.signatures.map(sig => {
-                if (sig.signer_id == signerId && sig.page == page) {
+                if (sig.signer_id == box.dataset.signerId && sig.page == parseInt(box.dataset.page)) {
                     return { ...sig, x_percent: xPercent, y_percent: yPercent };
                 }
                 return sig;
@@ -656,7 +716,7 @@ console.log('DRAG X%', xPercent);
         }
     });
 
-    box.addEventListener('pointerup', function () {
+    box.addEventListener('pointerup', () => {
         isDragging = false;
         box.style.cursor = 'move';
     });
@@ -1421,30 +1481,16 @@ document.addEventListener('click', function (e) {
         const page = parseInt(box.dataset.page);
         const fileIndex = parseInt(box.dataset.fileIndex || activeFileIndex);
 
-        // Hapus box dari DOM
         box.remove();
 
-        // Hapus dari data file terkait
         const file = uploadedFiles[fileIndex];
         if (file) {
-            // Hapus signature dari array
             file.signatures = file.signatures.filter(sig => 
                 !(sig.signer_id == signerId && sig.page == page)
             );
-
-            // Cek apakah signer masih digunakan di **semua file**
-            const isStillUsedAnywhere = uploadedFiles.some((f, idx) => {
-                return f.signatures.some(sig => sig.signer_id == signerId);
-            });
-
-            // Jika tidak digunakan di mana pun → enable kembali
-            if (!isStillUsedAnywhere) {
-                file.usedSigners.delete(signerId); // bersihkan juga di file ini
-                updateSignerUIForCurrentFile();   // refresh UI
-            }
         }
 
-        // Re-render signatures di halaman saat ini
+        updateSignerUIForCurrentFile();
         renderSignaturesForPage(currentPage);
     }
 });
@@ -1688,81 +1734,99 @@ function renderPDF(pageNumber = 1) {
             }).promise.then(() => {
                 $('#pageInfo').text(`Page ${currentPage} of ${totalPages}`);
                 renderSignaturesForPage(currentPage);
+                updateSignerUIForCurrentFile();
             });
         });
     });
 }
-
-// ================= RENDER SIGNATURES FOR PAGE - FIXED =================
 function renderSignaturesForPage(page) {
-    // Hapus SEMUA signature box lama (global)
+    // Hapus semua box lama
     document.querySelectorAll('.signature-box').forEach(box => box.remove());
 
     const file = uploadedFiles[activeFileIndex];
     if (!file) return;
 
     const placementType = document.querySelector('input[name="placementType"]:checked').value;
+
+    if (placementType !== 'custom') return;
+
+    const pageSignatures = file.signatures.filter(sig => sig.page === page);
     
-    console.log(`Rendering signatures for page ${page}, file: ${file.name}, placementType: ${placementType}`);
-    console.log('Available signatures:', file.signatures);
+    pageSignatures.forEach(sig => {
+        const box = document.createElement('div');
+        box.className = 'signature-box';
+        box.dataset.signerId = sig.signer_id;
+        box.dataset.signerName = sig.signer_name;
+        box.dataset.page = sig.page;
+        box.dataset.x = sig.x_percent;
+        box.dataset.y = sig.y_percent;
+        box.dataset.tier = sig.tier || 1;
+        box.dataset.fileIndex = activeFileIndex;
 
-    // 🔥 IMPORTANT: HANYA render visual box untuk CUSTOM mode
-    if (placementType === 'custom') {
-        const pageSignatures = file.signatures.filter(sig => sig.page === page);
-        console.log(`Found ${pageSignatures.length} signatures for page ${page}`);
-        
-        pageSignatures.forEach(sig => {
-            const box = document.createElement('div');
-            box.classList.add('signature-box');
-            box.dataset.signerId = sig.signer_id;
-            box.dataset.signerName = sig.signer_name;
-            box.dataset.page = sig.page;
-            box.dataset.x = sig.x_percent;
-            box.dataset.y = sig.y_percent;
-            box.dataset.tier = sig.tier || 1;
-            box.dataset.fileIndex = activeFileIndex;
+        box.innerHTML = `
+            <div class="delete-signature">×</div>
+            <div class="signature-text">
+                <span class="approved-by">Approved by</span>
+                <span class="approver-name">${sig.signer_name}</span>
+                <span class="at">at</span>
+                <span class="datetime">${new Date().toLocaleString('id-ID', { 
+                    day: '2-digit', month: 'short', year: 'numeric', 
+                    hour: '2-digit', minute: '2-digit' 
+                }).replace(',', '')}</span>
+            </div>
+            <div class="resize-handle"></div>
+        `;
 
-           // Format: Approved by Name at Date Time (memanjanghorizontal)
-box.innerHTML = `
-    <div class="delete-signature">×</div>
-    <div class="signature-text">
-        <span class="approved-by">Approved by</span>
-        <span class="approver-name">${sig.signer_name}</span>
-        <span class="at">at</span>
-        <span class="datetime">${new Date().toLocaleString('id-ID', { 
-            day: '2-digit', month: 'short', year: 'numeric', 
-            hour: '2-digit', minute: '2-digit' 
-        }).replace(',', '')}</span>
-    </div>
-`;
-            positionSignatureBox(box);
-            makeSignatureBoxDraggable(box);
-            pdfArea.appendChild(box);
-        });
+        const xPx = (parseFloat(sig.x_percent) / 100) * pdfCanvas.width;
+        const yPx = (parseFloat(sig.y_percent) / 100) * pdfCanvas.height;
+
+        positionSignatureBoxAtCanvas(box, xPx, yPx);
+        makeSignatureBoxDraggable(box);
+        makeResizable(box);
         
-        updateSignerUIForCurrentFile();
-    }
-    // Untuk standard/fixed: TIDAK render visual box sama sekali
+        pdfArea.appendChild(box);
+    });
 }
 
+// ================= MAKE RESIZABLE =================
+function makeResizable(box) {
+    const handle = box.querySelector('.resize-handle');
+    if (!handle) return;
+
+    let isResizing = false;
+
+    handle.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        isResizing = true;
+        document.body.style.cursor = 'nwse-resize';
+    });
+
+    document.addEventListener('pointermove', (e) => {
+        if (!isResizing) return;
+
+        const rect = box.getBoundingClientRect();
+        
+        let newWidth = e.clientX - rect.left;
+        newWidth = Math.max(220, Math.min(newWidth, 420)); // batas ukuran
+
+        box.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('pointerup', () => {
+        isResizing = false;
+        document.body.style.cursor = 'default';
+    });
+}
 // ================= UPDATE SIGNER UI - FIXED =================
 function updateSignerUIForCurrentFile() {
     const currentFile = uploadedFiles[activeFileIndex];
-    const currentPageNum = currentPage;
-    
     if (!currentFile) return;
-    
-    console.log(`Updating signer UI for page ${currentPageNum}, usedSigners:`, Array.from(currentFile.usedSigners));
 
-    document.querySelectorAll('.signer-item').forEach(item => {
+    document.querySelectorAll('#dynamicSignerList .signer-item').forEach(item => {
         const signerId = item.dataset.signerId;
-        
-        // Cek apakah signer sudah digunakan di HALAMAN INI (berdasarkan signatures array)
         const isUsedOnCurrentPage = currentFile.signatures.some(
-            sig => sig.signer_id == signerId && sig.page === currentPageNum
+            sig => sig.signer_id == signerId && sig.page === currentPage
         );
-
-        console.log(`Signer ${signerId} used on page ${currentPageNum}:`, isUsedOnCurrentPage);
 
         if (isUsedOnCurrentPage) {
             item.classList.add('disabled');
@@ -2071,7 +2135,7 @@ function applyStandardFixedSignatures(mode) {
             // =================================================
             // VERTIKAL STACKING - Mulai dari tengah-kiri
             // =================================================
-            const baseX = 70;        // Ubah dari 85 → 70 (30% dari kanan)
+           const baseX = 78;   // lebih ke kanan   // Ubah dari 85 → 70 (30% dari kanan)
             const startY = 90;        // 10% dari bawah
             const stepY = 12;         // jarak vertikal antar signature
             const stepX = 15;        // jarak horizontal jika sudah penegak
@@ -2533,75 +2597,85 @@ function collectCompletePayload() {
         background: #000;
     }
 
+    .signature-box .resize-handle {
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border: 2px solid #1a5c1a;
+    border-radius: 50%;
+    cursor: nwse-resize;
+    z-index: 101;
+}
+
     #pdfCanvas {
         display: block;
         max-width: 100%;
         height: auto;
     }
 
-    /* Signature Box - Format Horizontal Memanjang */
-.signature-box {
+  .signature-box {
     position: absolute;
-    padding: 7px 16px;
-    background: transparent;
-    color: black;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #1a5c1a 0%, #0d3d0d 100%);
+    color: white;
     font-size: 11px;
-    line-height: 1;
+    line-height: 1.4;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 6px;
     cursor: move;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     z-index: 100;
-    white-space: nowrap;           /* penting agar memanjang */
-    min-width: 260px;
-    max-width: 420px;              /* sesuaikan jika nama sangat panjang */
+    white-space: nowrap;
+    min-width: 240px;           /* dikecilkan sedikit */
+    max-width: 380px;           /* biar tidak terlalu lebar */
     text-align: left;
+    user-select: none;
 }
 
+/* Buat lebih compact & mudah diatur posisi kanan */
 .signature-box .signature-text {
-       display: flex;
+    display: flex;
     align-items: center;
-
-    /* UBAH */
-    justify-content: flex-start;
-
-    gap: 4px;
-
-    /* UBAH */
+    gap: 5px;
     flex-wrap: nowrap;
 }
 
 .signature-box .approved-by,
 .signature-box .at {
-    font-size: 9.8px;
-    opacity: 0.85;
+    font-size: 9.5px;
+    opacity: 0.9;
 }
 
 .signature-box .approver-name {
     font-weight: 700;
-    font-size: 11.5px;
+    font-size: 11.8px;
 }
 
 .signature-box .datetime {
-    font-size: 10px;
-    color: black;
+    font-size: 9.8px;
+    color: #a8d8a8;
     font-family: 'Courier New', monospace;
 }
 
 /* Delete button */
 .signature-box .delete-signature {
     position: absolute;
-    top: -7px;
-    right: -7px;
+    top: -8px;
+    right: -8px;
     background: #dc3545;
     color: white;
-    width: 18px;
-    height: 18px;
-    font-size: 13px;
-    line-height: 16px;
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+    line-height: 18px;
     border-radius: 50%;
     text-align: center;
     cursor: pointer;
     border: 2px solid white;
 }
-
     /* Responsive adjustments */
     @media (max-width: 768px) {
         .signature-box {

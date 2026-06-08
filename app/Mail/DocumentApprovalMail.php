@@ -23,11 +23,22 @@ class DocumentApprovalMail extends Mailable
 
     public function build()
     {
-        return $this->subject(' Dokumen Menunggu Persetujuan: ' . $this->document->document_name)
-                    ->view('emails.document_approval') // Pastikan view ini ada di resources/views/emails/
-                    ->with([
-                        'docName' => $this->document->document_name,
-                        'order' => $this->approval->approver_order,
-                    ]);
+        $subject = $this->document->email_subject 
+            ? $this->document->email_subject 
+            : 'Document Approval Required: ' . $this->document->document_name;
+
+        $messageContent = $this->document->email_message;
+
+        $viewData = [
+            'docName'     => $this->document->document_name,
+            'order'       => $this->approval->approver_order,
+            'approval'    => $this->approval,
+            'document'    => $this->document,
+            'customMessage' => $messageContent,   // Untuk digunakan di view
+        ];
+
+        return $this->subject($subject)
+                    ->view('emails.document_approval')
+                    ->with($viewData);
     }
 }

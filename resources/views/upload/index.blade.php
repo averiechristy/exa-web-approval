@@ -269,6 +269,8 @@
         division_id: {{ session('active_division_id') ?? 'null' }},
         is_requester: true
     };
+    const requesterIsHighestRole = @json($requesterIsHighestRole ?? false); 
+// Atau ambil dari response JSON:
     let currentStep = 0;
     let step1Data = {}; 
     const steps = document.querySelectorAll('.step');
@@ -1098,6 +1100,11 @@ function loadWorkflowApprovers(organizationId, workflowId, requesterDivisionId) 
 
             response.workflow_steps.forEach(group => {
                 const tier = parseInt(group.tier);
+
+                if (tier === 0 && window.requesterIsHighestRole) {
+                    console.log('Tier 0 skipped - Requester is highest role');
+                    return;
+                }
                 const isTierZero = tier === 0;
 
                 let tierHtml = `
@@ -1122,6 +1129,9 @@ function loadWorkflowApprovers(organizationId, workflowId, requesterDivisionId) 
                 $('#tierContainer').append(tierHtml);
             });
 
+            if (!window.requesterIsHighestRole) {
+                addRequesterToTierZero();
+            }
             // Render approver dari backend
             response.workflow_steps.forEach(group => {
                 const tier = parseInt(group.tier);
@@ -1151,6 +1161,8 @@ function loadWorkflowApprovers(organizationId, workflowId, requesterDivisionId) 
 
 
 function addRequesterToTierZero() {
+    if (window.requesterIsHighestRole) return;
+
     const tierZeroContainer = $('.tier-box[data-tier="0"] .approvers-list');
     
     if (tierZeroContainer.find('.requester-row').length > 0) return; // cegah duplikat
@@ -1666,16 +1678,18 @@ function renderPDF(pageNumber = 1) {
         totalPages = pdf.numPages;
 
         pdf.getPage(pageNumber).then(page => {
-            const viewport = page.getViewport({ scale: 1.5 }); // Naikkan scale awal
+            const viewport = page.getViewport({ scale: 1 });
 
-            // Scale agar pas di area besar
-            const containerWidth = pdfArea.clientWidth - 40;
-            const scale = Math.min(
-                containerWidth / viewport.width,
-                1.8  // batas maksimal zoom
-            );
+const containerWidth = pdfArea.clientWidth - 20;
+const containerHeight = pdfArea.clientHeight - 20;
 
-            const scaledViewport = page.getViewport({ scale });
+const scaleX = containerWidth / viewport.width;
+const scaleY = containerHeight / viewport.height;
+
+// pilih yang paling besar tapi jangan lebih dari area
+const scale = Math.min(scaleX, scaleY);
+
+const scaledViewport = page.getViewport({ scale });
 
             pdfCanvas.width = scaledViewport.width;
             pdfCanvas.height = scaledViewport.height;
@@ -1853,7 +1867,7 @@ function collectSignatureData() {
 
 else if(type === 'standard') {
     showOnDocApprovers.forEach((approver, index) => {
-        const yPos = 90 - (index * 2);
+        const yPos = 0.87 - (index * 0.02);
 
         for(let p = 1; p <= file.totalPages; p++) {
             fileData.signatures.push({
@@ -1861,7 +1875,7 @@ else if(type === 'standard') {
                 division_id: approver.division_id,
                 tier: approver.tier,
                 page_number: p,
-                pos_x_percent: 2,
+                pos_x_percent: 0.02,
                 pos_y_percent: yPos,
                 mode: 'standard'
             });
@@ -1872,8 +1886,8 @@ else if(type === 'fixed') {
     const lastPage = file.totalPages;
     
     // Konfigurasi offset - sama seperti applyStandardFixedSignatures
-    const startY = 90;
-    const stepY = 2;
+    const startY = 0.87;
+    const stepY = 0.02;
 
     showOnDocApprovers.forEach((approver, index) => {
         let yPos = startY - (index * stepY);
@@ -1883,7 +1897,7 @@ else if(type === 'fixed') {
             division_id: approver.division_id,
             tier: approver.tier,
             page_number: lastPage,
-            pos_x_percent: 2,
+            pos_x_percent: 0.02,
             pos_y_percent: yPos,
             mode: 'fixed'
         });
@@ -2475,6 +2489,9 @@ function collectCompletePayload() {
             cache: false,
             contentType: false,
             processData: false,
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            },
             
             xhr: function() {
                 let xhr = new window.XMLHttpRequest();
@@ -2531,6 +2548,7 @@ function collectCompletePayload() {
         border: 1px solid #e0e4f0;
         border-radius: 8px;
         background: #000;
+        
     }
 
     #pdfCanvas {
@@ -2745,5 +2763,6 @@ function collectCompletePayload() {
             padding: 10px;
         }
     }
+    
 </style>
 @endpush

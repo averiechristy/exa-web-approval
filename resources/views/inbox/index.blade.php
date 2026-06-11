@@ -155,17 +155,17 @@
                                     <a href="{{ route('inbox.preview', $document->id) }}" class="btn btn-sm btn-light" title="View">
                                         <i class="fas fa-eye text-secondary"></i>
                                     </a>
-                                    <a href="#" class="btn btn-sm btn-light" title="Download">
-                                        <i class="fas fa-download text-success"></i>
-                                    </a>
+                                    <a href="{{ route('inbox.download', $document->id) }}" 
+                                        class="btn btn-sm btn-light" 
+                                        title="Download"
+                                        download>
+                                            <i class="fas fa-download text-success"></i>
+                                        </a>
                                     <a href="#" class="btn btn-sm btn-light" title="Share">
                                         <i class="fas fa-share-alt text-info"></i>
                                     </a>
                                     <a href="#" class="btn btn-sm btn-light" title="Move">
                                         <i class="fas fa-folder-open text-warning"></i>
-                                    </a>
-                                    <a href="#" class="btn btn-sm btn-light" title="Void">
-                                        <i class="fas fa-ban text-danger"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -191,28 +191,163 @@
     @endif
 
 </div>
-
 <script>
-    // Bulk Action Script
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.rowCheckbox');
-    const bulkExportBtn = document.getElementById('bulkExportBtn');
-    const bulkApproveBtn = document.getElementById('bulkApproveBtn');
+// Bulk Action Script
+const selectAll = document.getElementById('selectAll');
+const checkboxes = document.querySelectorAll('.rowCheckbox');
+const bulkExportBtn = document.getElementById('bulkExportBtn');
+const bulkApproveBtn = document.getElementById('bulkApproveBtn');
 
-    function toggleButtons() {
-        const anyChecked = document.querySelectorAll('.rowCheckbox:checked').length > 0;
-        bulkExportBtn.disabled = !anyChecked;
-        bulkApproveBtn.disabled = !anyChecked;
+function toggleButtons() {
+    const anyChecked = document.querySelectorAll('.rowCheckbox:checked').length > 0;
+    bulkExportBtn.disabled = !anyChecked;
+    bulkApproveBtn.disabled = !anyChecked;
+}
+
+// Select All
+selectAll?.addEventListener('change', function () {
+    checkboxes.forEach(cb => cb.checked = this.checked);
+    toggleButtons();
+});
+
+// Individual checkbox
+checkboxes.forEach(cb => {
+    cb.addEventListener('change', toggleButtons);
+});
+// ==================== BULK APPROVE HANDLER ====================
+bulkApproveBtn?.addEventListener('click', async function () {
+    const checkedBoxes = document.querySelectorAll('.rowCheckbox:checked');
+    const documentIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+    if (documentIds.length === 0) return;
+
+    const confirmResult = await Swal.fire({
+       title: 'Are you sure?',
+        html: `You are about to approve <strong>${documentIds.length}</strong> document(s).<br><br>
+               <small class="text-muted">I have opened and reviewed all selected documents.<br>
+               If any document has not been opened yet, the entire bulk approve will be cancelled.</small>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, Approve All',
+        cancelButtonText: 'Cancel'
+    });
+
+    if (!confirmResult.isConfirmed) {
+        return;
     }
 
-    selectAll?.addEventListener('change', function () {
-        checkboxes.forEach(cb => cb.checked = this.checked);
-        toggleButtons();
+    const originalText = this.innerHTML;
+    this.disabled = true;
+    this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing...`;
+
+    try {
+        const response = await fetch('{{ route("inbox.bulkApprove") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ document_ids: documentIds })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: result.message,
+                timer: 2500,
+                showConfirmButton: false
+            }).then(() => location.reload());
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Bulk Approve Failed',
+                html: result.error || result.message,
+                footer: result.invalid_documents ? 
+                    '<small>Invalid documents:<br>' + result.invalid_documents.join('<br>') + '</small>' : ''
+            });
+        }
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Connection error. Please try again.'
+        });
+    } finally {
+        this.disabled = false;
+        this.innerHTML = originalText;
+    }
+});
+
+{{-- Tambahkan di dalam <script> yang sudah ada --}}
+// ==================== BULK EXPORT HANDLER ====================
+bulkExportBtn?.addEventListener('click', async function () {
+    const checkedBoxes = document.querySelectorAll('.rowCheckbox:checked');
+    const documentIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+    if (documentIds.length === 0) return;
+
+    const confirmResult = await Swal.fire({
+        title: 'Export Documents',
+        html: `You are about to export <strong>${documentIds.length}</strong> document(s) as ZIP file.`,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, Export Now'
     });
 
-    checkboxes.forEach(cb => {
-        cb.addEventListener('change', toggleButtons);
-    });
+    if (!confirmResult.isConfirmed) return;
+
+    const originalText = this.innerHTML;
+    this.disabled = true;
+    this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Creating ZIP...`;
+
+    try {
+        const response = await fetch('{{ route("inbox.bulkExport") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ document_ids: documentIds })
+        });
+
+        if (!response.ok) throw new Error('Export failed');
+
+        // Handle file download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `documents_export_${new Date().toISOString().slice(0,10)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Export Successful',
+            text: `${documentIds.length} documents have been exported.`,
+            timer: 2500,
+            showConfirmButton: false
+        });
+
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Export Failed',
+            text: 'Failed to create ZIP file. Please try again.'
+        });
+    } finally {
+        this.disabled = false;
+        this.innerHTML = originalText;
+    }
+});
 </script>
-
 @endsection

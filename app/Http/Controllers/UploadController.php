@@ -10,6 +10,7 @@ use App\Models\Documents;
 use App\Models\DocumentShare;
 use App\Models\Folder;
 use App\Models\Organization;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\UserAccess;
 use App\Models\Workflow;
@@ -143,7 +144,10 @@ class UploadController extends Controller
         $orgId = $request->organization_id;
         $requesterDivisionId = $request->division_id;   // division requester
         $currentUser = auth()->user();
+        $activeRoleId = session('active_role_id');
 
+        $activeRoleLevel = Role::where('id', $activeRoleId)->value('role_level');
+$highestRoleLevel = Role::max('role_level');
         // Ambil workflow steps
         $workflowSteps = WorkflowStep::with('division')
             ->where('workflow_id', $workflowId)
@@ -151,15 +155,19 @@ class UploadController extends Controller
             ->get();
 
         $result = [];
+        $isRequesterHighestRole = ($activeRoleLevel == $highestRoleLevel);
+
 
         // ================== GROUP 1: Same Division - Higher Role ==================
-        $sameDivisionUsers = UserAccess::with(['user', 'role'])
+        
+        // Masukkan sebagai Tier 0 atau "Direct Superior"
+       if (!$isRequesterHighestRole) {
+       $sameDivisionUsers = UserAccess::with(['user', 'role'])
             ->where('organization_id', $orgId)
             ->where('division_id', $requesterDivisionId)
             // ->where('user_id', '!=', $currentUser->id)
-            ->whereHas('role', function($q) use ($currentUser) {
-                // Role lebih tinggi dari user saat ini
-                $q->where('role_level', '>', $currentUser->active_role_level ?? 1);
+            ->whereHas('role', function ($q) use ($activeRoleLevel) {
+                $q->where('role_level', '>', $activeRoleLevel);   // Hanya yang lebih tinggi
             })
             ->get()
             ->map(function($access) {
@@ -171,47 +179,35 @@ class UploadController extends Controller
                     'source'     => 'same_division'
                 ];
             });
+            
 
-    //            $sameDivisionUsers = UserAccess::with(['user', 'role'])
-    // ->where('organization_id', $orgId)
-    // ->where('division_id', $requesterDivisionId)
-    // ->where(function ($q) use ($currentUser) {
-    //     // Kondisi 1: Wajibkan Current User untuk muncul (tidak peduli level rolenya)
-    //     $q->where('user_id', $currentUser->id)
-        
-    //     // Kondisi 2: ATAU, Jika user BUKAN current user...
-    //     ->orWhere(function ($q2) use ($currentUser) {
-    //         $q2->where('user_id', '!=', $currentUser->id)
-    //            // ...maka role-nya harus lebih tinggi dari current user
-    //            ->whereHas('role', function ($q3) use ($currentUser) {
-    //                $q3->where('role_level', '>', $currentUser->active_role_level ?? 1);
-    //            });
-    //     });
-    // })
-    // ->get()
-    // ->map(function($access) {
-    //     return [
-    //         'id'         => $access->user->id,
-    //         'name'       => $access->user->name,
-    //         'role_name'  => $access->role->role_name ?? '',
-    //         'role_level' => $access->role->role_level,
-    //         'source'     => 'same_division'
-    //     ];
-    // });
 
-        // Masukkan sebagai Tier 0 atau "Direct Superior"
         if ($sameDivisionUsers->isNotEmpty()) {
             $division = Division::find($requesterDivisionId);
             $result[] = [
                 'tier'          => 0,
-                'title'         => "Tier 0",
+                'title'         => "Tier 0 • Direct Superior",
                 'division_name' => $division->division_name ?? 'Unknown',
                 'division_id'   => $division?->id ?? '',
                 'sla_days'      => 0,
                 'users'         => $sameDivisionUsers,
-                'is_same_division' => true
+                'is_same_division' => true,
+                'is_requester_highest' => false
             ];
         }
+    } else {
+        // Optional: Kirim info ke frontend
+        $result[] = [
+            'tier'          => 0,
+            'title'         => "Tier 0",
+            'division_name' => 'Highest Role',
+            'division_id'   => $requesterDivisionId,
+            'sla_days'      => 0,
+            'users'         => [],
+            'is_same_division' => true,
+            'is_requester_highest' => true   // Flag penting
+        ];
+    }
 
         // ================== GROUP 2: Workflow Tiers ==================
         foreach ($workflowSteps as $step) {
@@ -246,7 +242,8 @@ class UploadController extends Controller
 
         return response()->json([
             'success' => true,
-            'workflow_steps' => $result
+            'workflow_steps' => $result,
+            'requester_is_highest_role' => $isRequesterHighestRole
         ]);
     }
     /**
@@ -455,6 +452,11 @@ private function applyRequesterSignature($document, $payload, $fileIndex, $appro
 
                 $x = $pos['pos_x_percent'] * $pageWidth;
 $y = $pos['pos_y_percent'] * $pageHeight;
+
+
+    \Log::info('Writing approved text at x: ' . $x . ', y: ' . $y);
+    \Log::info('Page width: ' . $pageWidth . ', Page height: ' . $pageHeight);
+    \Log::info('Text to insert: ' . $textToInsert);
 
 $pdf->SetFont('helvetica', 'B', 11);
 $pdf->SetTextColor(0, 128, 0);

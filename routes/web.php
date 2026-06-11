@@ -64,6 +64,13 @@ Route::get('/inbox/documents/{document}/preview', [InboxController::class, 'prev
 
     Route::post('/documents/{document}/approve', [InboxController::class, 'approve'])
      ->name('document.approve');
+
+     Route::post('/documents/{document}/reject', [InboxController::class, 'reject'])->name('document.reject');
+     Route::post('/inbox/bulk-approve', [InboxController::class, 'bulkApprove'])->name('inbox.bulkApprove');
+     Route::get('/inbox/documents/{document}/download', [InboxController::class, 'download'])
+     ->name('inbox.download');
+     Route::post('/inbox/bulk-export', [InboxController::class, 'bulkExport'])
+     ->name('inbox.bulkExport');
      // ===== ROUTES UNTUK DOCUMENT =====
 
 Route::prefix('documents')->name('documents.')->group(function () {
@@ -76,6 +83,10 @@ Route::prefix('documents')->name('documents.')->group(function () {
 
     // Optional: Share, Move, Void, dll
     Route::post('/{document}/share', [DocumentController::class, 'share'])->name('share');
+
+    
 });
+
+
 });
 

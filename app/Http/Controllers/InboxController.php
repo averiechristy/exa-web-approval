@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Mail;
 use setasign\Fpdi\Tcpdf\Fpdi;
 use Storage;
 
+use ZipArchive;
+
 class InboxController extends Controller
 {
     /**
@@ -50,6 +52,61 @@ class InboxController extends Controller
 // }
 
 
+
+public function bulkExport(Request $request)
+{
+    $documentIds = $request->input('document_ids', []);
+
+    if (empty($documentIds)) {
+        return response()->json(['error' => 'No documents selected'], 400);
+    }
+
+    $documents = Documents::whereIn('id', $documentIds)->get();
+
+    if ($documents->isEmpty()) {
+        return response()->json(['error' => 'Documents not found'], 404);
+    }
+
+    // Buat nama file ZIP
+    $zipFileName = 'documents_export_' . now()->format('Ymd_His') . '.zip';
+    $zipPath = storage_path('app/temp/' . $zipFileName);
+
+    // Pastikan folder temp ada
+    if (!file_exists(storage_path('app/temp'))) {
+        mkdir(storage_path('app/temp'), 0755, true);
+    }
+
+    $zip = new ZipArchive;
+
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+        return response()->json(['error' => 'Cannot create ZIP file'], 500);
+    }
+
+    $failed = [];
+
+    foreach ($documents as $doc) {
+        if (!$doc->path || !Storage::disk('public')->exists($doc->path)) {
+            $failed[] = $doc->document_name;
+            continue;
+        }
+
+        $filePath = Storage::disk('public')->path($doc->path);
+        $fileNameInZip = $doc->document_name;
+
+        // Tambahkan ekstensi jika belum ada
+        if (!str_contains($fileNameInZip, '.')) {
+            $ext = pathinfo($filePath, PATHINFO_EXTENSION);
+            $fileNameInZip .= '.' . $ext;
+        }
+
+        $zip->addFile($filePath, $fileNameInZip);
+    }
+
+    $zip->close();
+
+    // Return file untuk di-download
+    return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
+}
 public function index()
 {
     $user = auth()->user();
@@ -383,6 +440,296 @@ $pdf->Write(0, $textToInsert);
     }
 }
 
+// Di controller yang sama (misalnya InboxController atau DocumentController)
+public function bulkApprove(Request $request)
+{
+    $documentIds = $request->input('document_ids', []);
+    
+    if (empty($documentIds)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No documents selected.'
+        ], 400);
+    }
+
+    $approver = auth()->user();
+
+    // === CEK SEMUA DOKUMEN DULU ===
+    $invalidDocuments = [];
+    
+    foreach ($documentIds as $id) {
+        $document = Documents::find($id);
+        if (!$document) {
+            $invalidDocuments[] = "Document ID {$id} not found.";
+            continue;
+        }
+        
+        if (!$document->flag_open) {
+            $invalidDocuments[] = $document->document_name;
+        }
+    }
+
+    // Jika ada dokumen yang belum dibuka → GAGAL SEMUA
+    if (!empty($invalidDocuments)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Bulk approve cannot proceed.',
+            'error'   => 'Some documents have not been opened yet. Please open and review them first before approving.',
+            'invalid_documents' => $invalidDocuments
+        ], 422);
+    }
+
+    // === Jika semua sudah dibuka, lanjut proses ===
+    $results = [
+        'success' => [],
+        'failed'  => []
+    ];
+
+    foreach ($documentIds as $id) {
+        try {
+            $document = Documents::findOrFail($id);
+
+            $documentApproval = DocumentApproval::where('document_id', $id)
+                ->where('approver_id', $approver->id)
+                ->first();
+
+            if (!$documentApproval || $documentApproval->status !== 'PENDING') {
+                $results['failed'][] = [
+                    'id' => $id,
+                    'name' => $document->document_name,
+                    'reason' => 'No pending approval for you'
+                ];
+                continue;
+            }
+
+            $approvalResult = $this->processSingleApproval($document, $documentApproval, $approver);
+
+            if ($approvalResult['success']) {
+                $results['success'][] = [
+                    'id' => $id,
+                    'name' => $document->document_name,
+                    'status' => $approvalResult['document_status']
+                ];
+            } else {
+                $results['failed'][] = [
+                    'id' => $id,
+                    'name' => $document->document_name,
+                    'reason' => $approvalResult['message']
+                ];
+            }
+
+        } catch (\Exception $e) {
+            \Log::error("Bulk Approve Error - Doc ID {$id}: " . $e->getMessage());
+            $results['failed'][] = ['id' => $id, 'reason' => $e->getMessage()];
+        }
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => "Bulk approve completed. Success: " . count($results['success']) . ", Failed: " . count($results['failed']),
+        'results' => $results
+    ]);
+}
+private function processSingleApproval($document, $documentApproval, $approver)
+{
+    $approvalTime = now()->format('d M Y H:i');
+    $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
+
+    $showOnDoc = $documentApproval->show_on_doc ?? true;
+    $positions = ApprovalPosition::where('document_approval_id', $documentApproval->id)->get();
+
+    $originalPath = storage_path('app/public/' . $document->path);
+    $newFilename = time() . '_' . basename($document->path);
+    $newPath = 'documents/approved/' . $newFilename;
+    $newFullPath = storage_path('app/public/' . $newPath);
+
+    Storage::disk('public')->makeDirectory('documents/approved', 0755, true);
+
+    try {
+        $pdf = new Fpdi();
+        $pdf->setFontSubsetting(true);
+        $pageCount = $pdf->setSourceFile($originalPath);
+
+        for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+            $pdf->AddPage();
+            $tplId = $pdf->importPage($pageNo);
+            $pdf->useTemplate($tplId);
+
+            if (!$showOnDoc) continue;
+
+            $size = $pdf->getTemplateSize($tplId);
+            $pageWidth = $size['width'];
+            $pageHeight = $size['height'];
+
+            foreach ($positions as $pos) {
+                if ((int)$pos->page_number !== $pageNo) continue;
+
+                $x = $pos->pos_x_percent * $pageWidth;
+                $y = $pos->pos_y_percent * $pageHeight;
+
+                $pdf->SetFont('helvetica', 'B', 11);
+                $pdf->SetTextColor(0, 128, 0);
+                $pdf->SetXY($x, $y);
+                $pdf->Write(0, $textToInsert);
+            }
+        }
+
+        $pdf->Output($newFullPath, 'F');
+
+        // Update approval record
+        $now = now();
+        $isOverdue = $documentApproval->due_at && $now->gt($documentApproval->due_at);
+
+        $documentApproval->update([
+            'status'       => 'APPROVED',
+            'completed_at' => $now,
+            'is_overdue'   => $isOverdue,
+        ]);
+
+        // Tier logic (sama seperti method approve lama)
+        $currentTier = $document->current_tier;
+        $tierApprovals = DocumentApproval::where('document_id', $document->id)
+            ->where('tier', $currentTier)
+            ->get();
+
+        $approvedInTier = $tierApprovals->where('status', 'APPROVED')->count();
+        $totalInTier = $tierApprovals->count();
+
+        $shouldAdvanceTier = ($approvedInTier === $totalInTier);
+        $newTier = $shouldAdvanceTier ? $currentTier + 1 : $currentTier;
+
+        // Overall status
+        $allApprovals = DocumentApproval::where('document_id', $document->id)->get();
+        $documentStatus = ($allApprovals->where('status', 'APPROVED')->count() === $allApprovals->count())
+            ? 'APPROVED'
+            : 'PARTIALLY APPROVED';
+
+        $document->update([
+            'path'         => $newPath,
+            'status'       => $documentStatus,
+            'approved_by'  => $approver->id,
+            'current_tier' => $newTier,
+        ]);
+
+        $this->notifyNextApprover($document); // jika method ini ada
+
+        return [
+            'success' => true,
+            'document_status' => $documentStatus,
+            'message' => $documentStatus === 'APPROVED' 
+                ? 'Fully approved' 
+                : ($shouldAdvanceTier ? "Tier {$newTier}" : 'Partially approved')
+        ];
+
+    } catch (\Exception $e) {
+        \Log::error('PDF Approval Error: ' . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => $e->getMessage()
+        ];
+    }
+}
+public function reject(Request $request, $id)
+{
+    $document = Documents::findOrFail($id);
+    $reason = $request->input('reason');
+
+    if (empty($reason)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'The rejection reason is required.'
+        ], 422);
+    }
+
+    $approver = auth()->user();
+
+    // Ambil approval record approver saat ini
+    $documentApproval = DocumentApproval::where('document_id', $id)
+        ->where('approver_id', $approver->id)
+        ->first();
+
+    if (!$documentApproval) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Approval record not found or you are not authorized to access it.'
+        ], 404);
+    }
+
+    if ($documentApproval->status !== 'PENDING') {
+        return response()->json([
+            'success' => false,
+            'message' => 'This approval has already been processed.'
+        ], 400);
+    }
+    try {
+        $now = now();
+
+        // Update approval saat ini
+        $documentApproval->update([
+            'status'        => 'REJECTED',
+            'completed_at'  => $now,
+            'remarks'       => $reason,
+            'is_overdue'    => $documentApproval->due_at && $now->gt($documentApproval->due_at),
+        ]);
+
+        // Reject semua approver di tier yang sama dan tier berikutnya
+        $currentTier = $document->current_tier;
+
+        DocumentApproval::where('document_id', $id)
+            ->where('tier', '>=', $currentTier)
+            ->where('status', 'PENDING')
+            ->update([
+                'status'       => 'REJECTED',
+                'completed_at' => $now,
+                'remarks'      => 'Document rejected by previous approver: ' . $reason,
+            ]);
+
+        // Update document status menjadi REJECTED
+        $document->update([
+            'status'      => 'REJECTED',
+            'rejected_by' => $approver->id,
+            'rejected_at' => $now,
+            // path tetap sama (tidak perlu generate PDF baru saat reject)
+        ]);
+
+        // Optional: Kirim notifikasi ke pembuat dokumen atau approver lain
+        // $this->notifyDocumentRejected($document, $reason);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document has been rejected.',
+            'status'  => 'REJECTED'
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('PDF Rejection Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine());
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to process document rejection: ' . $e->getMessage()
+        ], 500);
+    }
+}
+public function download($id)
+{
+    $document = Documents::findOrFail($id);
+
+    // Cek apakah file ada
+    if (!$document->path || !Storage::disk('public')->exists($document->path)) {
+        abort(404, 'File tidak ditemukan');
+    }
+
+    $filePath = $document->path;
+    $fileName = $document->document_name;
+
+    // Tambahkan ekstensi jika belum ada di nama
+    if (!str_contains($fileName, '.')) {
+        $extension = pathinfo($filePath, PATHINFO_EXTENSION);
+        $fileName .= '.' . $extension;
+    }
+
+    return Storage::disk('public')->download($filePath, $fileName);
+}
 /**
  * Notify all approvers in the next tier
  */
@@ -420,6 +767,7 @@ private function notifyNextApprover($document)
         }
     }
 }
+
 /**
  * Generate full breadcrumb path
  */
@@ -435,6 +783,7 @@ private function getFolderBreadcrumb(Folder $folder)
 
     return array_reverse($breadcrumb); // dari root ke current
 }
+
 /** 
      * Show the form for creating a new resource.
      */

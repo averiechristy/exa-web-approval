@@ -156,15 +156,52 @@
         Swal.fire({
             title: 'Reject Document?',
             input: 'textarea',
-            inputLabel: 'Reason for rejection',
-            inputPlaceholder: 'Enter rejection reason...',
+            inputLabel: 'Rejection Reason',
+            inputPlaceholder: 'Please explain the reason for rejecting this document...',
+            inputAttributes: {
+                'aria-label': 'Rejection reason'
+            },
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
-            confirmButtonText: 'Reject'
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Reject',
+            cancelButtonText: 'Cancel',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'A rejection reason is required.';
+                }
+            }
         }).then((result) => {
             if (result.isConfirmed && result.value) {
-                // TODO: Implement reject logic later
-                Swal.fire('Rejected', 'Document has been rejected.', 'info');
+                fetch("{{ route('document.reject', $document->id) }}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reason: result.value
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Rejected!',
+                            text: 'The document has been rejected.',
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    Swal.fire('Error', 'An error occurred while processing the document rejection.', 'error');
+                });
             }
         });
     });

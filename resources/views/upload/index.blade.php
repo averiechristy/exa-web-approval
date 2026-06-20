@@ -130,6 +130,9 @@
                 Check "Show on document" if you want the signature to appear on the PDF.
             </div>
 
+            <!-- ================= REQUESTER ================= -->
+            <div id="requesterSection" class="mb-4"></div>
+
             <!-- ================= APPROVERS ================= -->
             <h5 class="font-weight-bold text-primary mb-4">
                 <i class="fas fa-users mr-2"></i> Approver List
@@ -376,75 +379,82 @@
     }
 
     // ================= DYNAMIC SIGNER LIST FROM STEP 2 =================
-    function renderSignerListFromStep2() {
-        const step2Data = collectStep2Data();
-        const showOnDocSigners = [];
-        
-        // Kumpulkan semua approver yang "Show on document"
-        step2Data.approvers.forEach(tier => {
-            tier.approvers.forEach(approver => {
-                if (approver.show_on_document) {
-                    // Ambil nama dari option text atau fallback
-                    const tierBox = $(`.tier-box[data-tier="${tier.tier}"]`);
-                    const select = tierBox.find('.approver-select').filter(function() {
-                        return $(this).val() == approver.user_id;
-                    });
-                    
-                    let approverName = 'Unknown User';
-                    if (select.length > 0) {
-                        approverName = select.find('option:selected').text() || select.find(`option[value="${approver.user_id}"]`).text();
-                    }
-                    
-                    showOnDocSigners.push({
-                        id: approver.user_id,
-                        name: approverName,
-                        tier: tier.tier,
-                        division_id: approver.division_id
-                    });
-                }
-            });
-        });
-        
-        // Render signer list
-        const signerList = document.getElementById('dynamicSignerList');
-        if (showOnDocSigners.length === 0) {
-            signerList.innerHTML = `
-                <div class="list-group-item text-muted small p-3 text-center">
-                    <i class="fas fa-info-circle"></i> No approvers selected for document
-                </div>
-            `;
-            return [];
-        }
-        
-        signerList.innerHTML = '';
-        showOnDocSigners.forEach(signer => {
-            const item = document.createElement('div');
-            item.className = 'list-group-item signer-item px-3 py-2';
-            item.draggable = true;
-            item.dataset.signerId = signer.id;
-            item.dataset.signerName = signer.name;
-            item.dataset.tier = signer.tier;
-            item.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-user text-primary mr-2"></i>
-                    <div>
-                        <div class="font-weight-medium" style="font-size: 13px;">${signer.name}</div>
-                        <small class="text-muted">Tier ${signer.tier}</small>
-                    </div>
-                    <i class="fas fa-grip-vertical text-muted ml-auto cursor-grab" style="font-size: 12px;"></i>
-                </div>
-            `;
-            signerList.appendChild(item);
-        });
-        
-        // Attach drag events
-        document.querySelectorAll('#dynamicSignerList .signer-item').forEach(item => {
-            item.addEventListener('dragstart', handleSignerDragStart);
-        });
-        
-        return showOnDocSigners;
-    }
+    // ================= DYNAMIC SIGNER LIST FROM STEP 2 =================
+function renderSignerListFromStep2() {
+    const step2Data = collectStep2Data();
+    const showOnDocSigners = [];
+    
+    step2Data.approvers.forEach(tier => {
+        tier.approvers.forEach(approver => {
+            if (approver.show_on_document) {
+                
+                let approverName = approver.name || 'Unknown User';
 
+                // Special handling untuk Requester
+                if (approver.is_requester === true) {
+                    approverName = requester.name + " (You)";
+                } 
+                // Untuk approver biasa
+                else {
+                    const tierBox = $(`.tier-box[data-tier="${tier.tier}"]`);
+                    if (tierBox.length) {
+                        const select = tierBox.find('.approver-select').filter(function() {
+                            return $(this).val() == approver.user_id;
+                        });
+                        if (select.length > 0) {
+                            approverName = select.find('option:selected').text().trim() || approverName;
+                        }
+                    }
+                }
+
+                showOnDocSigners.push({
+                    id: approver.user_id,
+                    name: approverName,
+                    tier: tier.tier,
+                    division_id: approver.division_id
+                });
+            }
+        });
+    });
+    
+    // Render signer list
+    const signerList = document.getElementById('dynamicSignerList');
+    if (showOnDocSigners.length === 0) {
+        signerList.innerHTML = `
+            <div class="list-group-item text-muted small p-3 text-center">
+                <i class="fas fa-info-circle"></i> No approvers selected for document
+            </div>
+        `;
+        return [];
+    }
+    
+    signerList.innerHTML = '';
+    showOnDocSigners.forEach(signer => {
+        const item = document.createElement('div');
+        item.className = 'list-group-item signer-item px-3 py-2';
+        item.draggable = true;
+        item.dataset.signerId = signer.id;
+        item.dataset.signerName = signer.name;
+        item.dataset.tier = signer.tier;
+        item.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas fa-user text-primary mr-2"></i>
+                <div>
+                    <div class="font-weight-medium" style="font-size: 13px;">${signer.name}</div>
+                </div>
+                <i class="fas fa-grip-vertical text-muted ml-auto cursor-grab" style="font-size: 12px;"></i>
+            </div>
+        `;
+        signerList.appendChild(item);
+    });
+    
+    // Attach drag events
+    document.querySelectorAll('#dynamicSignerList .signer-item').forEach(item => {
+        item.addEventListener('dragstart', handleSignerDragStart);
+    });
+    
+    return showOnDocSigners;
+}
     function handleSignerDragStart(e) {
         const signerId = this.dataset.signerId;
         const currentFile = uploadedFiles[activeFileIndex];
@@ -534,7 +544,9 @@
         box.innerHTML = `
             <div class="delete-signature">×</div>
             <div class="signature-text">
-                <span class="approved-by">Approved by</span>
+                <span class="approved-by">
+            ${parseInt(draggedSigner.id) === parseInt(requester.user_id) ? 'Requested by' : 'Approved by'}
+        </span>
                 <span class="approver-name">${draggedSigner.name}</span>
                 <span class="at">at</span>
                 <span class="datetime">${new Date().toLocaleString('id-ID', { 
@@ -1018,9 +1030,8 @@
                     $('#tierContainer').append(tierHtml);
                 });
 
-                if (!window.requesterIsHighestRole) {
-                    addRequesterToTierZero();
-                }
+                renderRequesterSection();
+
                 // Render approver dari backend
                 response.workflow_steps.forEach(group => {
                     const tier = parseInt(group.tier);
@@ -1029,10 +1040,6 @@
                     }
                 });
 
-                // ================= TAMBAHKAN REQUESTER DI TIER 0 =================
-                if ($('.tier-box[data-tier="0"]').length > 0) {
-                    addRequesterToTierZero();
-                }
 
                 // Event listener Add Approver (hanya untuk tier > 0)
                 $('.add-approver-per-tier').off('click').on('click', function() {
@@ -1048,15 +1055,22 @@
         });
     }
 
-    function addRequesterToTierZero() {
-        if (window.requesterIsHighestRole) return;
+// ================= REQUESTER SECTION (di atas Approver List) =================
+function renderRequesterSection() {
+    const requesterSection = document.getElementById('requesterSection');
+    
+    if (window.requesterIsHighestRole) {
+        requesterSection.innerHTML = '';
+        return;
+    }
 
-        const tierZeroContainer = $('.tier-box[data-tier="0"] .approvers-list');
-        
-        if (tierZeroContainer.find('.requester-row').length > 0) return; // cegah duplikat
-
-        const requesterHtml = `
-            <div class="row align-items-center approver-row mb-3 requester-row" data-division="${requester.division_id}">
+    const requesterHtml = `
+        <div class="tier-box border rounded p-3 bg-light">
+            <h6 class="text-primary mb-3">
+                <i class="fas fa-user-check text-success"></i> Requester
+            </h6>
+            <div class="row align-items-center approver-row requester-row" 
+                 data-division="${requester.division_id || ''}">
                 <div class="col-md-5">
                     <label class="small text-muted">Requester</label>
                     <select class="form-control approver-select" data-tier="0" disabled>
@@ -1074,12 +1088,14 @@
                 <div class="col-md-3 mt-4">
                     <span class="text-success small"><i class="fas fa-lock"></i> Auto Approved</span>
                 </div>
-            </div>`;
+            </div>
+        </div>
+    `;
 
-        // Masukkan di paling atas Tier 0
-        tierZeroContainer.prepend(requesterHtml);
-    }
+    requesterSection.innerHTML = requesterHtml;
+}
 
+// Panggil fungsi ini setelah load approvers
     // Fungsi untuk menambah row approver di dalam tier
     function addApproverRow(tier, usersList, divisionId = '') {
         const container = $(`.approvers-list[data-tier="${tier}"]`);
@@ -1535,7 +1551,9 @@
     box.innerHTML = `
         <div class="delete-signature">×</div>
         <div class="signature-text">
-            <span class="approved-by">Approved by</span>
+           <span class="approved-by">
+            ${parseInt(sig.signer_id) === parseInt(requester.user_id) ? 'Requested by' : 'Approved by'}
+        </span>
             <span class="approver-name">${sig.signer_name}</span>
             <span class="at">at</span>
             <span class="datetime">${new Date().toLocaleString('id-ID', { 
@@ -1724,64 +1742,91 @@
     }
 
     // ================= COLLECT STEP 2 DATA =================
-    function collectStep2Data() {
-        const approvers = [];
+// ================= COLLECT STEP 2 DATA =================
+// ================= COLLECT STEP 2 DATA =================
+function collectStep2Data() {
+    const approvers = [];
 
-        $('.tier-box').each(function() {
-            const tier = parseInt($(this).data('tier'));
-            const tierApprovers = [];
-            
-            $(this).find('.approver-row').each(function() {
-                const approverSelect = $(this).find('.approver-select');
-                const showOnDoc = $(this).find('.show-on-doc');
-                const isRequester = $(this).hasClass('requester-row');
-                
-                const approverId = approverSelect.val();
-                const selectedOption = approverSelect.find('option:selected');
-                
-                if (approverId) {
-                    tierApprovers.push({
-                        user_id: approverId,
-                        name: selectedOption.text().trim() || 'Unknown',
-                        division_id: selectedOption.data('division') || $(this).data('division') || '',
-                        show_on_document: showOnDoc.is(':checked'),
-                        is_requester: isRequester,
-                        status: isRequester ? 'Approved' : 'Pending'
-                    });
-                }
-            });
-            
-            if (tierApprovers.length > 0) {
-                approvers.push({
-                    tier: tier,
-                    division_id: $(this).find('.approvers-list').data('division-id') || '',
-                    sla_days: parseInt($(this).data('sla-days') || 0),
-                    approvers: tierApprovers
-                });
-            }
+    // ================= REQUESTER SECTION =================
+    const requesterRow = $('.requester-row');
+    if (requesterRow.length > 0) {
+        const showOnDoc = requesterRow.find('.show-on-doc').is(':checked');
+        const divisionId = requesterRow.data('division') || requester.division_id || null;
+
+        approvers.push({
+            tier: 0,
+            division_id: divisionId,
+            sla_days: 0,
+            approvers: [{
+                user_id: requester.user_id,
+                name: requester.name,
+                division_id: divisionId,
+                show_on_document: showOnDoc,
+                is_requester: true,
+                status: 'Approved'
+            }]
         });
+    }
 
-        // CC tetap sama...
-        const ccUsers = [];
-        $('.cc-row').each(function() {
-            const ccSelect = $(this).find('.ccDropdown');
-            const ccUserId = ccSelect.val();
-            if (ccUserId) {
-                const selected = ccSelect.find('option:selected');
-                ccUsers.push({
-                    user_id: ccUserId,
-                    division_id: selected.data('division') || '',
-                    name: selected.text().trim() || ''
+    // ================= TIER BOXES (Termasuk Tier 0) =================
+    $('.tier-box').each(function() {
+        const tier = parseInt($(this).data('tier'));
+        const tierApprovers = [];
+        
+        $(this).find('.approver-row').each(function() {
+            const approverSelect = $(this).find('.approver-select');
+            const showOnDoc = $(this).find('.show-on-doc');
+            
+            const approverId = approverSelect.val();
+            const selectedOption = approverSelect.find('option:selected');
+            
+            // SKIP jika approver ini adalah requester (hindari duplikat)
+            if (approverId && parseInt(approverId) === parseInt(requester.user_id)) {
+                return;
+            }
+
+            if (approverId) {
+                tierApprovers.push({
+                    user_id: approverId,
+                    name: selectedOption.text().trim() || 'Unknown',
+                    division_id: selectedOption.data('division') || $(this).data('division') || '',
+                    show_on_document: showOnDoc.is(':checked'),
+                    is_requester: false,
+                    status: 'Pending'
                 });
             }
         });
         
-        return {
-            approvers: approvers,
-            cc_users: ccUsers
-        };
-    }
+        if (tierApprovers.length > 0) {
+            approvers.push({
+                tier: tier,
+                division_id: $(this).find('.approvers-list').data('division-id') || '',
+                sla_days: parseInt($(this).data('sla-days') || 0),
+                approvers: tierApprovers
+            });
+        }
+    });
 
+    // CC tetap sama
+    const ccUsers = [];
+    $('.cc-row').each(function() {
+        const ccSelect = $(this).find('.ccDropdown');
+        const ccUserId = ccSelect.val();
+        if (ccUserId) {
+            const selected = ccSelect.find('option:selected');
+            ccUsers.push({
+                user_id: ccUserId,
+                division_id: selected.data('division') || '',
+                name: selected.text().trim() || ''
+            });
+        }
+    });
+    
+    return {
+        approvers: approvers,
+        cc_users: ccUsers
+    };
+}
     // Placement type change handler
     document.querySelectorAll('input[name="placementType"]').forEach(radio => {
         radio.addEventListener('change', function () {
@@ -2151,24 +2196,24 @@
         let approvalIdCounter = 1;
         const approvalTemplate = [];
 
-        step2.approvers.forEach(tierData => {
-            tierData.approvers.forEach((approver, idx) => {
-                const isRequester = approver.is_requester === true;
+      step2.approvers.forEach(tierData => {
+    tierData.approvers.forEach((approver, idx) => {
+        const isRequester = approver.is_requester === true;
 
-                approvalTemplate.push({
-                    temp_id: approvalIdCounter++,
-                    division_id: approver.division_id || tierData.division_id,
-                    approver_id: approver.user_id,
-                    approver_order: idx + 1,
-                    show_on_doc: approver.show_on_document,
-                    status: isRequester ? 'Approved' : 'Pending',
-                    tier: tierData.tier,
-                    workflow_step_id: parseInt(step1.document_type_id),
-                    sla_days: tierData.sla_days || 0,
-                    is_requester: isRequester   // ← INI YANG DITAMBAHKAN
-                });
-            });
+        approvalTemplate.push({
+            temp_id: approvalIdCounter++,
+            division_id: approver.division_id || tierData.division_id || null,
+            approver_id: approver.user_id,
+            approver_order: idx + 1,
+            show_on_doc: approver.show_on_document,
+            status: isRequester ? 'Approved' : 'Pending',
+            tier: tierData.tier ?? 0,           // ← FORCE TIER
+            workflow_step_id: parseInt(step1.document_type_id),
+            sla_days: tierData.sla_days || 0,
+            is_requester: isRequester
         });
+    });
+});
 
         payload.document_approvals = approvalTemplate;
 

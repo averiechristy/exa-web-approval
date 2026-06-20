@@ -476,7 +476,7 @@ class UploadController extends Controller
 
             $approver = User::find($requesterApproval['approver_id']);
             $approvalTime = now()->format('d M Y H:i');
-            $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
+            $textToInsert = "Requested by {$approver->name} at {$approvalTime}";
 
             $positions = collect($payload['file_positions'][$fileIndex]['signatures'] ?? [])
                 ->where('approver_temp_id', $requesterApproval['temp_id']);

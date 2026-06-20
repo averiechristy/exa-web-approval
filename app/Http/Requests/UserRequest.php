@@ -19,7 +19,7 @@ class UserRequest extends FormRequest
             'name' => [
                 'required',
                 'string',
-                'max:25'
+                'max:20'
             ],
 
             'email' => [
@@ -39,7 +39,7 @@ class UserRequest extends FormRequest
             'username' => [
                 'required',
                 'string',
-                'max:50',
+                'max:20',
                 Rule::unique('users')
                 ->ignore($this->id)
                 ->where(function ($query) {

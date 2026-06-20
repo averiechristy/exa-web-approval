@@ -1858,7 +1858,7 @@ function renderSignaturesForPage(page) {
                     approver_id: approver.user_id,
                     approver_order: idx + 1,
                     show_on_doc: approver.show_on_document,
-                    status: 'PENDING',
+                    status: 'Pending',
                     tier: tierData.tier,
                     workflow_step_id: parseInt(step1.document_type_id),
                     sla_days: tierData.sla_days || 0,

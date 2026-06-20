@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\LogActivityJob;
 use App\Models\User;
 use App\Models\UserAccess;
 use Hash;
@@ -67,11 +68,60 @@ class UserService
             }
         }
 
+        LogActivityJob::dispatchSync(
+            logName: 'user',
+            causedBy: auth()->user(),
+            performedOn: $user,
+            event: 'user.created',
+            description: 'Create User',
+            properties: [
+                'attributes' => [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'username' => $user->username,
+                    'system_role' => $user->systemRole?->system_role_name,
+                    'is_active' => $user->is_active ? 'Active' : 'Inactive',
+
+                    'access' => $user->userAccesses->map(function ($access) {
+                        return [
+                            'organization' => $access->organization?->organization_name,
+                            'division' => $access->division?->division_name,
+                            'role' => $access->role?->role_name,
+                            'manager' => $access->manager?->name,
+                        ];
+                    })->values(),
+                ],
+            ],
+        );
+
         return $user;
     }
 
     public function updateUser(User $user, array $data): User
     {
+        $user->load([
+            'systemRole',
+            'userAccesses.organization',
+            'userAccesses.division',
+            'userAccesses.role',
+            'userAccesses.manager',
+        ]);
+
+        $oldData = [
+            'name' => $user->name,
+            'email' => $user->email,
+            'username' => $user->username,
+            'system_role' => $user->systemRole?->system_role_name,
+            'is_active' => $user->is_active ? 'Active' : 'Inactive',
+            'access' => $user->userAccesses->map(function ($access) {
+                return [
+                    'organization' => $access->organization?->organization_name,
+                    'division' => $access->division?->division_name,
+                    'role' => $access->role?->role_name,
+                    'manager' => $access->manager?->name,
+                ];
+            })->values()->toArray(),
+        ];
         $user->update([
             'name' => $data['name'],
             'email' => $data['email'],
@@ -100,12 +150,84 @@ class UserService
             }
         }
 
-        return $user->fresh(); 
+        $user = $user->fresh()->load([
+            'systemRole',
+            'userAccesses.organization',
+            'userAccesses.division',
+            'userAccesses.role',
+            'userAccesses.manager',
+        ]);
+
+        $newData = [
+            'name' => $user->name,
+            'email' => $user->email,
+            'username' => $user->username,
+            'system_role' => $user->systemRole?->system_role_name,
+            'is_active' => $user->is_active ? 'Active' : 'Inactive',
+            'access' => $user->userAccesses->map(function ($access) {
+                return [
+                    'organization' => $access->organization?->organization_name,
+                    'division' => $access->division?->division_name,
+                    'role' => $access->role?->role_name,
+                    'manager' => $access->manager?->name,
+                ];
+            })->values()->toArray(),
+        ];
+
+        LogActivityJob::dispatchSync(
+            logName: 'user',
+            causedBy: auth()->user(),
+            performedOn: $user,
+            event: 'user.updated',
+            description: 'Update User',
+            properties: [
+                'old' => $oldData,
+                'attributes' => $newData,
+            ],
+        );
+
+        return $user;
     }
 
     public function deleteUser(User $user)
     {
+        $user->load([
+            'systemRole',
+            'userAccesses.organization',
+            'userAccesses.division',
+            'userAccesses.role',
+            'userAccesses.manager',
+        ]);
+
+        $oldData = [
+            'name' => $user->name,
+            'email' => $user->email,
+            'username' => $user->username,
+            'system_role' => $user->systemRole?->system_role_name,
+            'is_active' => $user->is_active ? 'Active' : 'Inactive',
+            'access' => $user->userAccesses->map(function ($access) {
+                return [
+                    'organization' => $access->organization?->organization_name,
+                    'division' => $access->division?->division_name,
+                    'role' => $access->role?->role_name,
+                    'manager' => $access->manager?->name,
+                ];
+            })->values()->toArray(),
+        ];
+
+        LogActivityJob::dispatchSync(
+            logName: 'user',
+            causedBy: auth()->user(),
+            performedOn: $user,
+            event: 'user.deleted',
+            description: 'Delete User',
+            properties: [
+                'old' => $oldData,
+            ],
+        );
+
         UserAccess::where('user_id', $user->id)->delete();
+
         return $user->delete();
     }
 }

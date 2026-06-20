@@ -2003,7 +2003,7 @@ function collectStep2Data() {
                     division_id: selectedOption.data('division') || $(this).data('division') || '',
                     show_on_document: showOnDoc.is(':checked'),
                     is_requester: isRequester,
-                    status: isRequester ? 'APPROVED' : 'PENDING'
+                    status: isRequester ? 'Approved' : 'Pending'
                 });
             }
         });
@@ -2394,7 +2394,7 @@ function collectCompletePayload() {
             folder_id: step1.folder_id,
             requester_division_id: step1.division_id,
             workflow_id: parseInt(step1.document_type_id),
-            status: 'WAITING APPROVAL'
+            status: 'Need Approval'
         },
         files: uploadedFiles.map(f => ({
             name: f.name,
@@ -2424,7 +2424,7 @@ function collectCompletePayload() {
                 approver_id: approver.user_id,
                 approver_order: idx + 1,
                 show_on_doc: approver.show_on_document,
-                status: isRequester ? 'APPROVED' : 'PENDING',
+                status: isRequester ? 'Approved' : 'Pending',
                 tier: tierData.tier,
                 workflow_step_id: parseInt(step1.document_type_id),
                 sla_days: tierData.sla_days || 0,

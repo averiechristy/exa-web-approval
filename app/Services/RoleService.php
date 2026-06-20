@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\LogActivityJob;
 use App\Models\Role;
 
 class RoleService
@@ -35,17 +36,68 @@ class RoleService
             'role_level' => $data['role_level']
         ]);
 
+        LogActivityJob::dispatchSync(
+            logName: 'role',
+            causedBy: auth()->user(),
+            performedOn: $role,
+            event: 'role.created',
+            description: 'Create Role',
+            properties: [
+                'attributes' => [
+                    'role_name' => $role->role_name,
+                    'role_level' => $role->role_level
+                ],
+            ],
+        );
+
         return $role;
     }
 
     public function updateRole(Role $role, array $data): Role
     {
+        $oldData = [
+            'role_name' => $role->role_name,
+            'role_level' => $role->role_level
+        ];
+
         $role->update($data);
+
+         LogActivityJob::dispatchSync(
+            logName: 'role',
+            causedBy: auth()->user(),
+            performedOn: $role,
+            event: 'role.updated',
+            description: 'Update Role',
+            properties: [
+                'old' => $oldData,
+                'attributes' => [
+                    'role_name' => $role->role_name,
+                    'role_level' => $role->role_level
+                ],
+            ],
+        );
+
         return $role;
     }
 
     public function deleteRole(Role $role)
     {
+        $oldData = [
+            'role_name' => $role->role_name,
+            'role_level' => $role->role_level
+        ];
+
+        LogActivityJob::dispatchSync(
+            logName: 'role',
+            causedBy: auth()->user(),
+            performedOn: $role,
+            event: 'role.deleted',
+            description: 'Delete Role',
+            properties: [
+                'old' => $oldData,
+            ],
+        );
+
         return $role->delete();
     }
 }

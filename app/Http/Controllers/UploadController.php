@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\LogActivityJob;
 use App\Mail\DocumentApprovalMail;
 use App\Models\ApprovalPosition;
 use App\Models\Division;
@@ -121,22 +122,25 @@ class UploadController extends Controller
     public function getCC(Request $request)
     {
         $organizationId = $request->get('organization_id');
-        $divisionId = $request->get('division_id'); 
-        $documentTypeId = $request->get('document_type_id');
         
-        $users = User::select('users.id', 'users.name', 'users.email', 'user_accesses.organization_id', 'user_accesses.division_id')
-                    ->join('user_accesses', 'users.id', '=', 'user_accesses.user_id')
-                    ->where('user_accesses.division_id', $divisionId) // 🔥 Filter berdasarkan UserAccess division
-                    ->when($organizationId, function($q) use ($organizationId) {
-                        return $q->where('user_accesses.organization_id', $organizationId);
-                    })
-                    ->distinct()
-                    ->get();
+        $users = User::select(
+                'users.id',
+                'users.name',
+                'users.email',
+                'divisions.division_name as division_name'
+            )
+            ->join('user_accesses', 'users.id', '=', 'user_accesses.user_id')
+            ->join('divisions', 'user_accesses.division_id', '=', 'divisions.id')
+            ->when($organizationId, function ($q) use ($organizationId) {
+                $q->where('user_accesses.organization_id', $organizationId);
+            })
+            ->distinct()
+            ->get();
 
-        return response()->json([
-            'success' => true,
-            'users' => $users
-        ]);
+            return response()->json([
+                'success' => true,
+                'users' => $users
+            ]);
     }
 
     public function getWorkflowApprovers($workflowId, Request $request)
@@ -147,7 +151,7 @@ class UploadController extends Controller
         $activeRoleId = session('active_role_id');
 
         $activeRoleLevel = Role::where('id', $activeRoleId)->value('role_level');
-$highestRoleLevel = Role::max('role_level');
+        $highestRoleLevel = Role::max('role_level');
         // Ambil workflow steps
         $workflowSteps = WorkflowStep::with('division')
             ->where('workflow_id', $workflowId)
@@ -257,227 +261,283 @@ $highestRoleLevel = Role::max('role_level');
     /**
      * Store a newly created resource in storage.
      */
-  public function store(Request $request)
-{
-    try {
-        $payloadJson = $request->input('payload');
-        $payload = json_decode($payloadJson, true);
+    public function store(Request $request)
+    {
+        try {
+            $payloadJson = $request->input('payload');
+            $payload = json_decode($payloadJson, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return response()->json(['message' => 'Payload JSON invalid'], 422);
-        }
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return response()->json(['message' => 'Payload JSON invalid'], 422);
+            }
 
-        $uploadedFiles = $request->file('files');
-        if (empty($uploadedFiles)) {
-            return response()->json(['message' => 'No files uploaded'], 422);
-        }
+            $uploadedFiles = $request->file('files');
+            if (empty($uploadedFiles)) {
+                return response()->json(['message' => 'No files uploaded'], 422);
+            }
+            DB::beginTransaction();
 
-        DB::beginTransaction();
+            $folderName = 'documents/' . date('Y/m/d');
+            $createdDocuments = [];
 
-        $folderName = 'documents/' . date('Y/m/d');
-        $createdDocuments = [];
+            foreach ($uploadedFiles as $index => $file) {
+                
+                $meta = $payload['files'][$index] ?? [];
 
-        foreach ($uploadedFiles as $index => $file) {
-            $meta = $payload['files'][$index] ?? [];
+                $filename = time() . '_' . $index . '_' . 
+                            Str::slug(pathinfo($meta['name'] ?? 'document', PATHINFO_FILENAME)) . 
+                            '.' . $file->getClientOriginalExtension();
 
-            $filename = time() . '_' . $index . '_' . 
-                        Str::slug(pathinfo($meta['name'] ?? 'document', PATHINFO_FILENAME)) . 
-                        '.' . $file->getClientOriginalExtension();
-
-            $path = $file->storeAs($folderName, $filename, 'public');
-
-            // Create Document
-            $document = Documents::create([
-                'organization_id'       => $payload['document']['organization_id'],
-                'folder_id'             => $payload['document']['folder_id'],
-                'document_name'         => $meta['name'] ?? 'Untitled',
-                'path'                  => $path,
-                'status'                => 'WAITING APPROVAL',
-                'requester_id'          => auth()->id(),
-                'requester_division_id' => $payload['document']['requester_division_id'] ?? null,
-                'workflow_id'           => $payload['document']['workflow_id'],
-                'current_tier'          => 0,
-                'placement_type'        => $payload['placement_type'] ?? 'custom',
-                'email_subject'         => $payload['email_subject'] ?? null,
-                'email_message'         => $payload['email_message'] ?? null,
-            ]);
-
-            $createdDocuments[] = $document;
-
-            // Mapping temp_id => real approval id
-            $approvalIdsMap = [];
-
-            // ================= CREATE ALL APPROVALS =================
-            foreach ($payload['document_approvals'] as $app) {
-                $slaDays = (int) ($app['sla_days'] ?? 1);
-                $dueAt = $slaDays == 0 
-                    ? now()->endOfDay() 
-                    : now()->addDays($slaDays)->endOfDay();
-
-                $docApproval = DocumentApproval::create([
-                    'document_id'       => $document->id,
-                    'division_id'       => $app['division_id'],
-                    'approver_id'       => $app['approver_id'],
-                    'approver_order'    => $app['approver_order'],
-                    'show_on_doc'       => $app['show_on_doc'],
-                    'status'            => $app['status'] ?? 'PENDING',
-                    'tier'              => $app['tier'],
-                    'remarks'           => '',
-                    'sla_days'          => $slaDays,
-                    'workflow_step_id'  => $app['workflow_step_id'] ?? null,
-                    'started_at'        => now(),
-                    'due_at'            => $dueAt,
-                    'completed_at'      => $app['status'] === 'APPROVED' ? now() : null,
-                    'is_overdue'        => false,
+                $path = $file->storeAs($folderName, $filename, 'public');
+                
+                // Create Document
+                $document = Documents::create([
+                    'organization_id'       => $payload['document']['organization_id'],
+                    'folder_id'             => $payload['document']['folder_id'],
+                    'document_name'         => $meta['name'] ?? 'Untitled',
+                    'path'                  => $path,
+                    'status'                => 'Need Approval',
+                    'requester_id'          => auth()->id(),
+                    'requester_division_id' => $payload['document']['requester_division_id'] ?? null,
+                    'workflow_id'           => $payload['document']['workflow_id'],
+                    'current_tier'          => 0,
+                    'placement_type'        => $payload['placement_type'] ?? 'custom',
+                    'email_subject'         => $payload['email_subject'] ?? null,
+                    'email_message'         => $payload['email_message'] ?? null,
                 ]);
 
-                $approvalIdsMap[$app['temp_id']] = $docApproval->id;
+                $createdDocuments[] = $document;
 
-                // if ($app['approver_order'] == 2) {
-                //     $approverUser = User::find($app['approver_id']);
-                //     if ($approverUser && $approverUser->email) {
-                //         Mail::to($approverUser->email)
-                //             ->send(new DocumentApprovalMail($document, $docApproval));
-                //     }
-                // }
-            }
+                // Mapping temp_id => real approval id
+                $approvalIdsMap = [];
 
-            // ================= AUTO APPLY REQUESTER SIGNATURE KE PDF =================
-           $requesterApprovals = collect($payload['document_approvals'])
-                ->where('is_requester', true)
-                ->all();
+                // ================= CREATE ALL APPROVALS =================
+                foreach ($payload['document_approvals'] as $app) {
+                    $slaDays = (int) ($app['sla_days'] ?? 1);
+                    $dueAt = $slaDays == 0 
+                        ? now()->endOfDay() 
+                        : now()->addDays($slaDays)->endOfDay();
 
-            \Log::info('Requester in payload:', [
-                'has_requester' => !empty($requesterApprovals),
-                'requester_data' => $requesterApprovals,
-                'all_approvals_count' => count($payload['document_approvals'] ?? [])
-            ]);
-
-            // ================= AUTO APPLY REQUESTER SIGNATURE =================
-            if (!empty($requesterApprovals)) {
-                \Log::info('✅ Memanggil applyRequesterSignature untuk document ID: ' . $document->id);
-                
-                $this->applyRequesterSignature($document, $payload, $index, $approvalIdsMap);
-                
-                \Log::info('✅ applyRequesterSignature selesai dipanggil');
-            } else {
-                \Log::warning('❌ Tidak ada requester di payload document_approvals');
-            }
-
-            // ================= CREATE APPROVAL POSITIONS =================
-            $filePositions = $payload['file_positions'][$index]['signatures'] ?? [];
-            foreach ($filePositions as $pos) {
-                if (isset($approvalIdsMap[$pos['approver_temp_id']])) {
-                    ApprovalPosition::create([
-                        'document_approval_id' => $approvalIdsMap[$pos['approver_temp_id']],
-                        'page_number'          => $pos['page_number'],
-                        'pos_x_percent'        => $pos['pos_x_percent'],
-                        'pos_y_percent'        => $pos['pos_y_percent'],
-                        'mode'                 => $pos['mode']
+                    $docApproval = DocumentApproval::create([
+                        'document_id'       => $document->id,
+                        'division_id'       => $app['division_id'],
+                        'approver_id'       => $app['approver_id'],
+                        'approver_order'    => $app['approver_order'],
+                        'show_on_doc'       => $app['show_on_doc'],
+                        'status'            => $app['status'] ?? 'Pending',
+                        'tier'              => $app['tier'],
+                        'remarks'           => '',
+                        'sla_days'          => $slaDays,
+                        'workflow_step_id'  => $app['workflow_step_id'] ?? null,
+                        'started_at'        => now(),
+                        'due_at'            => $dueAt,
+                        'completed_at'      => $app['status'] === 'Approved' ? now() : null,
+                        'is_overdue'        => false,
                     ]);
+
+                    $approvalIdsMap[$app['temp_id']] = $docApproval->id;
+
+                    if ($app['approver_order'] == 2) {
+                        $approverUser = User::find($app['approver_id']);
+                        if ($approverUser && $approverUser->email) {
+                            Mail::to($approverUser->email)
+                                ->send(new DocumentApprovalMail($document, $docApproval));
+                        }
+                    }
+                }
+
+                // ================= AUTO APPLY REQUESTER SIGNATURE KE PDF =================
+            $requesterApprovals = collect($payload['document_approvals'])
+                    ->where('is_requester', true)
+                    ->all();
+
+                   
+
+                \Log::info('Requester in payload:', [
+                    'has_requester' => !empty($requesterApprovals),
+                    'requester_data' => $requesterApprovals,
+                    'all_approvals_count' => count($payload['document_approvals'] ?? [])
+                ]);
+
+                // ================= AUTO APPLY REQUESTER SIGNATURE =================
+                if (!empty($requesterApprovals)) {
+                    \Log::info('✅ Memanggil applyRequesterSignature untuk document ID: ' . $document->id);
+                    
+                    $this->applyRequesterSignature($document, $payload, $index, $approvalIdsMap);
+                    
+                    \Log::info('✅ applyRequesterSignature selesai dipanggil');
+                } else {
+                    \Log::warning('❌ Tidak ada requester di payload document_approvals');
+                }
+
+                // ================= CREATE APPROVAL POSITIONS =================
+                $filePositions = $payload['file_positions'][$index]['signatures'] ?? [];
+                foreach ($filePositions as $pos) {
+                    if (isset($approvalIdsMap[$pos['approver_temp_id']])) {
+                        ApprovalPosition::create([
+                            'document_approval_id' => $approvalIdsMap[$pos['approver_temp_id']],
+                            'page_number'          => $pos['page_number'],
+                            'pos_x_percent'        => $pos['pos_x_percent'],
+                            'pos_y_percent'        => $pos['pos_y_percent'],
+                            'mode'                 => $pos['mode']
+                        ]);
+                    }
+                }
+
+                // ================= CREATE CC / SHARES =================
+                foreach ($payload['document_shares'] as $share) {
+                    DocumentShare::create([
+                        'document_id' => $document->id,
+                        'share_to'    => $share['share_to'],
+                        'share_by'    => auth()->id(),
+                    ]);
+                }
+                $document->load([
+                    'organization',
+                    'folder',
+                    'workflow',
+                    'documentApprovals.approver',
+                    'documentshare.user',
+                ]);
+
+                LogActivityJob::dispatchSync(
+                    logName: 'document',
+                    causedBy: auth()->user(),
+                    performedOn: $document,
+                    event: 'document.created',
+                    description: 'Upload Document',
+                    properties: [
+                        'attributes' => [
+                            'document_name' => $document->document_name,
+                            'organization' => $document->organization?->organization_name,
+                            'folder' => $document->folder?->folder_name,
+                            'workflow' => $document->workflow?->document_type,
+                            'status' => $document->status,
+
+                            'approvers' => $document->documentApprovals->map(function ($approval) {
+                                return [
+                                    'approver' => $approval->approver?->name,
+                                    'tier' => $approval->tier,
+                                    'status' => $approval->status,
+                                ];
+                            })->toArray(),
+
+                            'shared_to' => $document->documentshare->map(function ($share) {
+                                return [
+                                    'user' => $share->user?->name,
+                                ];
+                            })->toArray(),
+                        ],
+                    ],
+                );
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => count($createdDocuments) . ' document(s) successfully created',
+                'document_ids' => collect($createdDocuments)->pluck('id')
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Document Store Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine());
+            
+            return response()->json([
+                'message' => 'An error occurred while saving document: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Auto apply requester signature to PDF if "Show on document" is checked
+     */
+    private function applyRequesterSignature($document, $payload, $fileIndex, $approvalIdsMap)
+    {
+        $requesterApproval = collect($payload['document_approvals'])
+            ->firstWhere('is_requester', true);
+
+        if (!$requesterApproval || !($requesterApproval['show_on_doc'] ?? false)) {
+            return; // Tidak perlu apply signature
+        }
+
+        $originalPath = storage_path('app/public/' . $document->path);
+        $newFilename = time() . '_req_' . basename($document->path);
+        $newPath = 'documents/approved/' . $newFilename;
+        $newFullPath = storage_path('app/public/' . $newPath);
+
+        Storage::disk('public')->makeDirectory('documents/approved');
+
+        try {
+            $pdf = new Fpdi();
+            $pdf->setFontSubsetting(true);
+            $pageCount = $pdf->setSourceFile($originalPath);
+
+            $approver = User::find($requesterApproval['approver_id']);
+            $approvalTime = now()->format('d M Y H:i');
+            $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
+
+            $positions = collect($payload['file_positions'][$fileIndex]['signatures'] ?? [])
+                ->where('approver_temp_id', $requesterApproval['temp_id']);
+
+            for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                $pdf->AddPage();
+                $tplId = $pdf->importPage($pageNo);
+                $pdf->useTemplate($tplId, 0, 0, null, null, true);
+
+                $size = $pdf->getTemplateSize($tplId);
+                $pageWidth = $size['width'];
+                $pageHeight = $size['height'];
+
+                $paddingY = 2;
+                // Apply signature requester di halaman yang sesuai
+                foreach ($positions as $pos) {
+                    if ((int)$pos['page_number'] !== $pageNo) continue;
+                    \Log::info([
+                        'page_no' => $pageNo,
+                        'target_page' => $pos['page_number'],
+                    ]);
+
+                    $x = $pos['pos_x_percent'] * $pageWidth;
+                    $y = ($pos['pos_y_percent'] * $pageHeight) + $paddingY;
+
+
+                    \Log::info('Writing approved text at x: ' . $x . ', y: ' . $y);
+                    \Log::info('Page width: ' . $pageWidth . ', Page height: ' . $pageHeight);
+                    \Log::info('Text to insert: ' . $textToInsert);
+
+                    $pdf->SetFont('helvetica', 'B', 11);
+                    $pdf->SetTextColor(0, 128, 0);
+                    $paddingY = 2;
+                    
+                    $pdf->SetXY($x, $y);
+                    \Log::info('Current Y before write: '.$pdf->GetY());
+                    $pdf->SetAutoPageBreak(false);
+                    
+                    $textWidth = $pdf->GetStringWidth($textToInsert);
+
+                    if (($x + $textWidth) > $pageWidth) {
+                        $x = $pageWidth - $textWidth - 5;
+                    }
+
+                    $pdf->Text($x, $y, $textToInsert);
+                    
                 }
             }
 
-            // ================= CREATE CC / SHARES =================
-            foreach ($payload['document_shares'] as $share) {
-                DocumentShare::create([
-                    'document_id' => $document->id,
-                    'share_to'    => $share['share_to'],
-                    'share_by'    => auth()->id(),
-                ]);
-            }
+            $pdf->Output($newFullPath, 'F');
+
+            // Update document path dengan PDF yang sudah ada signature requester
+            $document->update([
+                'path' => $newPath,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Requester Signature Error: ' . $e->getMessage());
+            // Tidak throw, biarkan proses store tetap berhasil
         }
-
-        DB::commit();
-
-        return response()->json([
-            'success' => true,
-            'message' => count($createdDocuments) . ' document(s) successfully created',
-            'document_ids' => collect($createdDocuments)->pluck('id')
-        ], 201);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        \Log::error('Document Store Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine());
-        
-        return response()->json([
-            'message' => 'An error occurred while saving document: ' . $e->getMessage()
-        ], 500);
     }
-}
-
-/**
- * Auto apply requester signature to PDF if "Show on document" is checked
- */
-private function applyRequesterSignature($document, $payload, $fileIndex, $approvalIdsMap)
-{
-    $requesterApproval = collect($payload['document_approvals'])
-        ->firstWhere('is_requester', true);
-
-    if (!$requesterApproval || !($requesterApproval['show_on_doc'] ?? false)) {
-        return; // Tidak perlu apply signature
-    }
-
-    $originalPath = storage_path('app/public/' . $document->path);
-    $newFilename = time() . '_req_' . basename($document->path);
-    $newPath = 'documents/approved/' . $newFilename;
-    $newFullPath = storage_path('app/public/' . $newPath);
-
-    Storage::disk('public')->makeDirectory('documents/approved');
-
-    try {
-        $pdf = new Fpdi();
-        $pdf->setFontSubsetting(true);
-        $pageCount = $pdf->setSourceFile($originalPath);
-
-        $approver = User::find($requesterApproval['approver_id']);
-        $approvalTime = now()->format('d M Y H:i');
-        $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
-
-        $positions = collect($payload['file_positions'][$fileIndex]['signatures'] ?? [])
-            ->where('approver_temp_id', $requesterApproval['temp_id']);
-
-        for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
-            $pdf->AddPage();
-            $tplId = $pdf->importPage($pageNo);
-            $pdf->useTemplate($tplId, 0, 0, null, null, true);
-
-            $size = $pdf->getTemplateSize($tplId);
-            $pageWidth = $size['width'];
-            $pageHeight = $size['height'];
-
-            // Apply signature requester di halaman yang sesuai
-            foreach ($positions as $pos) {
-                if ((int)$pos['page_number'] !== $pageNo) continue;
-
-                $x = $pos['pos_x_percent'] * $pageWidth;
-$y = $pos['pos_y_percent'] * $pageHeight;
-
-
-    \Log::info('Writing approved text at x: ' . $x . ', y: ' . $y);
-    \Log::info('Page width: ' . $pageWidth . ', Page height: ' . $pageHeight);
-    \Log::info('Text to insert: ' . $textToInsert);
-
-$pdf->SetFont('helvetica', 'B', 11);
-$pdf->SetTextColor(0, 128, 0);
-
-$pdf->SetXY($x, $y);
-$pdf->Write(0, $textToInsert);
-            }
-        }
-
-        $pdf->Output($newFullPath, 'F');
-
-        // Update document path dengan PDF yang sudah ada signature requester
-        $document->update([
-            'path' => $newPath,
-        ]);
-
-    } catch (\Exception $e) {
-        \Log::error('Requester Signature Error: ' . $e->getMessage());
-        // Tidak throw, biarkan proses store tetap berhasil
-    }
-}
     /**
      * Display the specified resource.
      */

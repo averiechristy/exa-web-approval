@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\LogActivityJob;
 use App\Models\Division;
 
 class DivisionService
@@ -34,17 +35,64 @@ class DivisionService
             'division_name' => $data['division_name']
         ]);
 
+        LogActivityJob::dispatchSync(
+            logName: 'division',
+            causedBy: auth()->user(),
+            performedOn: $division,
+            event: 'division.created',
+            description: 'Create Division',
+            properties: [
+                'attributes' => [
+                    'division_name' => $division->division_name,
+                ],
+            ],
+        );
+
         return $division;
     }
 
     public function updateDivision(Division $division, array $data): Division
     {
+        $oldData = [
+            'division_name' => $division->division_name,
+        ];
+
         $division->update($data);
+
+        LogActivityJob::dispatchSync(
+            logName: 'division',
+            causedBy: auth()->user(),
+            performedOn: $division,
+            event: 'division.updated',
+            description: 'Update Division',
+            properties: [
+                'old' => $oldData,
+                'attributes' => [
+                    'division_name' => $division->division_name,
+                ],
+            ],
+        );
+
         return $division;
     }
 
     public function deleteDivision(Division $division)
     {
+        $oldData = [
+            'division_name' => $division->division_name,
+        ];
+
+        LogActivityJob::dispatchSync(
+            logName: 'division',
+            causedBy: auth()->user(),
+            performedOn: $division,
+            event: 'division.deleted',
+            description: 'Delete Division',
+            properties: [
+                'old' => $oldData,
+            ],
+        );
+
         return $division->delete();
     }
 

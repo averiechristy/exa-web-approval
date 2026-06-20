@@ -42,7 +42,11 @@ class Documents extends Model
     }
     public function documentshare()
     {
-        return $this->hasMany(DocumentShare::class);
+        return $this->hasMany(
+            DocumentShare::class,
+            'document_id',
+            'id'
+        );
     }
 
     public function requester()
@@ -50,10 +54,15 @@ class Documents extends Model
         return $this->belongsTo(User::class, 'requester_id');
     }
 
+     public function workflow()
+    {
+        return $this->belongsTo(Workflow::class, 'workflow_id');
+    }
+
     public function getCurrentApprovers()
     {
         $currentTier = $this->documentapprovals()
-                            ->where('status', 'pending')
+                            ->where('status', 'Pending')
                             ->min('tier');
 
         return $this->documentapprovals()

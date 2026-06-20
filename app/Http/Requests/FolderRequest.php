@@ -33,13 +33,14 @@ class FolderRequest extends FormRequest
                 function ($attribute, $value, $fail) {
 
                     $exists = DB::table('folders')
-                        ->whereNull('deleted_at')
-                        ->where('organization_id', $this->organization_id)
-                        ->where('folder_name', $value)
-                        ->when($this->route('id'), function ($query) {
-                            $query->where('id', '!=', $this->route('id'));
-                        })
-                        ->exists();
+                    ->whereNull('deleted_at')
+                    ->where('organization_id', $this->organization_id)
+                    ->where('folder_name', $value)
+                    ->where('parent_id', $this->parent_id)
+                    ->when($this->route('id'), function ($query) {
+                        $query->where('id', '!=', $this->route('id'));
+                    })
+                    ->exists();
 
                     if ($exists) {
                         $fail('Folder name already exists in this organization.');

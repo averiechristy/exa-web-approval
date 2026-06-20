@@ -6,6 +6,7 @@ use App\Http\Controllers\FolderController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SharedController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkflowController;
@@ -56,37 +57,20 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/workflow-approvers/{workflow_id}', [UploadController::class, 'getWorkflowApprovers']);
     Route::post('/documents/store', [UploadController::class, 'store'])->name('documents.store');
     
-// Inbox
-Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
-Route::get('/inbox/{folder}', [InboxController::class, 'showFolder'])->name('inbox.show');
-Route::get('/inbox/documents/{document}/preview', [InboxController::class, 'preview'])
-    ->name('inbox.preview');
+    // Inbox
+    Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
+    Route::get('/inbox/{folder}', [InboxController::class, 'showFolder'])->name('inbox.show');
+    Route::get('/inbox/documents/{document}/preview', [InboxController::class, 'preview'])->name('inbox.preview');
+    Route::post('/documents/{document}/approve', [InboxController::class, 'approve'])->name('document.approve');
+    Route::post('/documents/{document}/reject', [InboxController::class, 'reject'])->name('document.reject');
+    Route::post('/inbox/bulk-approve', [InboxController::class, 'bulkApprove'])->name('inbox.bulkApprove');
+    Route::get('/inbox/documents/{document}/download', [InboxController::class, 'download'])->name('inbox.download');
+    Route::post('/inbox/bulk-export', [InboxController::class, 'bulkExport'])->name('inbox.bulkExport');
+    Route::post('/documents/move-folder', [InboxController::class, 'moveFolder'])->name('documents.move-folder');
 
-    Route::post('/documents/{document}/approve', [InboxController::class, 'approve'])
-     ->name('document.approve');
-
-     Route::post('/documents/{document}/reject', [InboxController::class, 'reject'])->name('document.reject');
-     Route::post('/inbox/bulk-approve', [InboxController::class, 'bulkApprove'])->name('inbox.bulkApprove');
-     Route::get('/inbox/documents/{document}/download', [InboxController::class, 'download'])
-     ->name('inbox.download');
-     Route::post('/inbox/bulk-export', [InboxController::class, 'bulkExport'])
-     ->name('inbox.bulkExport');
-     // ===== ROUTES UNTUK DOCUMENT =====
-
-Route::prefix('documents')->name('documents.')->group(function () {
-
-    Route::get('/{document}/view', [DocumentController::class, 'view'])
-         ->name('view');
-
-    Route::get('/{document}/download', [DocumentController::class, 'download'])
-         ->name('download');
-
-    // Optional: Share, Move, Void, dll
-    Route::post('/{document}/share', [DocumentController::class, 'share'])->name('share');
-
-    
-});
-
+    //Shared
+    Route::get('/shared', [SharedController::class, 'index'])->name('shared.index');
+    Route::get('shared/{folder}', [SharedController::class, 'showFolder'])->name('shared.show');
 
 });
 

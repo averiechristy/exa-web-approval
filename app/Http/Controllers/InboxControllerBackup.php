@@ -37,7 +37,7 @@ class InboxControllerBackup extends Controller
 //     ->where('status', 'IN_PROGRESS')                    // Hanya yang sedang berjalan
 //     ->whereHas('documentapprovals', function ($q) use ($user) {
 //         $q->where('approver_id', $user->id)
-//           ->where('status', 'PENDING')
+//           ->where('status', 'Pending')
 //           ->whereColumn('document_approvals.tier', 'documents.current_tier'); // Penting!
 //     })
 //     ->orderBy('updated_at', 'desc')
@@ -100,7 +100,7 @@ public function index()
 //         ->where('status', 'IN_PROGRESS')
 //         ->whereHas('documentapprovals', function ($q) use ($user) {
 //             $q->where('approver_id', $user->id)
-//               ->where('status', 'PENDING')
+//               ->where('status', 'Pending')
 //               ->whereColumn('document_approvals.tier', 'documents.current_tier');
 //         })
 //         ->orderBy('updated_at', 'desc')
@@ -128,23 +128,23 @@ public function showFolder(Folder $folder)
 //    $documents = Documents::with(['requester'])
 //     ->where('folder_id', $folder->id)
 //     ->where('organization_id', $organizationId)
-//     ->where('status', '!=', 'APPROVED')           // Tambahkan ini
+//     ->where('status', '!=', 'Approved')           // Tambahkan ini
 //     ->whereHas('documentapprovals', function ($q) use ($user) {
 //         $q->where('approver_id', $user->id)
 //           ->whereColumn('document_approvals.tier', 'documents.current_tier')
-//           ->whereIn('status', ['PENDING', 'APPROVED']); // Pastikan statusnya masih pending
+//           ->whereIn('status', ['Pending', 'Approved']); // Pastikan statusnya masih Pending
 //     })
 //     // === Kunci Utama: Cek apakah user adalah approver dengan order terkecil yang belum approve ===
 //     ->whereDoesntHave('documentapprovals', function ($q) use ($user) {
 //         $q->whereColumn('document_approvals.tier', 'documents.current_tier')
-//           ->where('status', 'PENDING')
+//           ->where('status', 'Pending')
 //           ->where('approver_order', '<', function ($sub) use ($user) {
 //               $sub->select('approver_order')
 //                   ->from('document_approvals')
 //                   ->whereColumn('document_approvals.document_id', 'documents.id')
 //                   ->whereColumn('document_approvals.tier', 'documents.current_tier')
 //                   ->where('approver_id', $user->id)
-//                   ->where('status', 'PENDING');
+//                   ->where('status', 'Pending');
 //           });
 //     })
 //     ->orderBy('updated_at', 'desc')
@@ -156,34 +156,34 @@ $documents = Documents::with(['requester'])
         // User pernah approve dokumen ini
         $q->whereHas('documentapprovals', function ($sub) use ($user) {
             $sub->where('approver_id', $user->id)
-                ->where('status', 'APPROVED');
+                ->where('status', 'Approved');
         })
         // ATAU user adalah approver aktif saat ini
         ->orWhereHas('documentapprovals', function ($sub) use ($user) {
             $sub->where('approver_id', $user->id)
-                ->where('status', 'PENDING')
+                ->where('status', 'Pending')
                 ->whereColumn('document_approvals.tier', 'documents.current_tier');
         });
     })
-    // Untuk approver aktif, pastikan tidak ada approver_order lebih kecil yang masih pending
+    // Untuk approver aktif, pastikan tidak ada approver_order lebih kecil yang masih Pending
     ->where(function ($q) use ($user) {
         // Jika sudah approve, langsung lolos
         $q->whereHas('documentapprovals', function ($sub) use ($user) {
             $sub->where('approver_id', $user->id)
-                ->where('status', 'APPROVED');
+                ->where('status', 'Approved');
         })
 
-        // Jika pending, cek urutannya
+        // Jika Pending, cek urutannya
         ->orWhereDoesntHave('documentapprovals', function ($sub) use ($user) {
             $sub->whereColumn('document_approvals.tier', 'documents.current_tier')
-                ->where('status', 'PENDING')
+                ->where('status', 'Pending')
                 ->where('approver_order', '<', function ($inner) use ($user) {
                     $inner->select('approver_order')
                         ->from('document_approvals')
                         ->whereColumn('document_approvals.document_id', 'documents.id')
                         ->whereColumn('document_approvals.tier', 'documents.current_tier')
                         ->where('approver_id', $user->id)
-                        ->where('status', 'PENDING');
+                        ->where('status', 'Pending');
                 });
         });
     })
@@ -271,7 +271,7 @@ public function preview($id)
 //         // Update database
 //         $document->update([
 //             'path'         => $newPath,
-//             'status'       => 'APPROVED',
+//             'status'       => 'Approved',
 //             'approved_by'  => $approver->id,
 //             'approved_at'  => now(),
 //         ]);
@@ -296,7 +296,7 @@ public function approve(Request $request, $id)
 {
     $document = Documents::findOrFail($id);
 
-    if ($document->status == 'APPROVED') {
+    if ($document->status == 'Approved') {
         return response()->json([
             'success' => false, 
             'message' => 'Document cannot be approved in current status.'
@@ -428,7 +428,7 @@ $pdf->Write(0, $textToInsert);
         }
 
         $documentApproval->update([
-            'status'        => 'APPROVED',
+            'status'        => 'Approved',
             'completed_at'  => $now,
             'is_overdue'    => $isOverdue,     // ← TAMBAHKAN INI
         ]);
@@ -439,7 +439,7 @@ $pdf->Write(0, $textToInsert);
             ->where('tier', $currentTier)
             ->get();
 
-        $approvedInTier = $tierApprovals->where('status', 'APPROVED')->count();
+        $approvedInTier = $tierApprovals->where('status', 'Approved')->count();
         $totalInTier = $tierApprovals->count();
 
         // Jika semua approver di tier ini sudah approve, naikkan tier
@@ -449,13 +449,13 @@ $pdf->Write(0, $textToInsert);
         // === CEK: Apakah semua approver sudah selesai? ===
         $allApprovals = DocumentApproval::where('document_id', $id)->get();
         $totalApprovers = $allApprovals->count();
-        $approvedCount = $allApprovals->where('status', 'APPROVED')->count();
+        $approvedCount = $allApprovals->where('status', 'Approved')->count();
 
-        $documentStatus = 'PARTIALLY APPROVED';
+        $documentStatus = 'In Progress';
         if ($approvedCount === $totalApprovers) {
-            $documentStatus = 'APPROVED';
+            $documentStatus = 'Approved';
         } elseif ($shouldAdvanceTier) {
-            $documentStatus = 'PARTIALLY APPROVED'; // Jadi pending untuk tier berikutnya
+            $documentStatus = 'In Progress'; // Jadi Pending untuk tier berikutnya
         }
 
         // === UPDATE DOCUMENT ===
@@ -469,7 +469,7 @@ $pdf->Write(0, $textToInsert);
         // === RESPONSE ===
         $remainingApprovers = $totalApprovers - $approvedCount;
 
-        if ($documentStatus === 'APPROVED') {
+        if ($documentStatus === 'Approved') {
             return response()->json([
                 'success' => true,
                 'message' => 'Document fully approved by all approvers.',
@@ -503,7 +503,7 @@ $pdf->Write(0, $textToInsert);
 // public function approve(Request $request, $id)
 // {
 //     $document = Documents::findOrFail($id);
-//     if ($document->status == 'APPROVED') {
+//     if ($document->status == 'Approved') {
 //         return response()->json([
 //             'success' => false,
 //             'message' => 'Document cannot be approved in current status.'
@@ -632,7 +632,7 @@ $pdf->Write(0, $textToInsert);
 //         }
 
 //         $documentApproval->update([
-//             'status' => 'APPROVED',
+//             'status' => 'Approved',
 //             'completed_at' => $now,
 //             'is_overdue' => $isOverdue,
 //         ]);
@@ -643,18 +643,18 @@ $pdf->Write(0, $textToInsert);
 //             ->where('tier', $currentTier)
 //             ->get();
 
-//         $approvedInTier = $tierApprovals->where('status', 'APPROVED')->count();
+//         $approvedInTier = $tierApprovals->where('status', 'Approved')->count();
 //         $totalInTier = $tierApprovals->count();
 //         $shouldAdvanceTier = ($approvedInTier === $totalInTier);
 //         $newTier = $shouldAdvanceTier ? $currentTier + 1 : $currentTier;
 
 //         $allApprovals = DocumentApproval::where('document_id', $id)->get();
 //         $totalApprovers = $allApprovals->count();
-//         $approvedCount = $allApprovals->where('status', 'APPROVED')->count();
+//         $approvedCount = $allApprovals->where('status', 'Approved')->count();
 
-//         $documentStatus = 'PARTIALLY APPROVED';
+//         $documentStatus = 'In Progress';
 //         if ($approvedCount === $totalApprovers) {
-//             $documentStatus = 'APPROVED';
+//             $documentStatus = 'Approved';
 //         }
 
 //         // === UPDATE DOCUMENT ===
@@ -666,7 +666,7 @@ $pdf->Write(0, $textToInsert);
 //         ]);
 
 //         // === RESPONSE ===
-//         if ($documentStatus === 'APPROVED') {
+//         if ($documentStatus === 'Approved') {
 //             return response()->json([
 //                 'success' => true,
 //                 'message' => 'Document fully approved by all approvers.',

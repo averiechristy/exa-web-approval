@@ -37,7 +37,7 @@
         </div>
         
         <div>
-            @if(optional($document->documentApprovals->first())->status == 'PENDING')
+            @if(optional($document->documentApprovals->first())->status == 'Pending')
                 <button class="btn btn-success btn-lg px-4" id="approveBtn">
                     <i class="fas fa-check-circle"></i> Approve
                 </button>
@@ -82,7 +82,6 @@
                 </div>
             </div>
         </div>
-
         <div class="col-lg-4">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white">
@@ -92,8 +91,22 @@
                     <table class="table table-borderless small">
                         <tr>
                             <td width="40%"><strong>Status</strong></td>
-                            <td><span class="badge badge-warning status-badge">{{$document->status}}</span></td>
+                            <td>
+                                @php
+                                    $status = $document->status;
+                                @endphp
+                                <span class="badge status-badge 
+                                    @if($status == 'Approved') badge-success
+                                    @elseif($status == 'Rejected') badge-danger
+                                    @elseif($status == 'In Progress' || $status == 'In Progrress') badge-info
+                                    @elseif($status == 'Need Approval') badge-warning
+                                    @else badge-secondary
+                                    @endif">
+                                    {{ $status }}
+                                </span>
+                            </td>
                         </tr>
+                        
                         <tr>
                             <td><strong>Document Name</strong></td>
                             <td>{{ $document->document_name }}</td>
@@ -103,6 +116,16 @@
                             <td>{{ $document->created_at->format('d M Y H:i') }}</td>
                         </tr>
                     </table>
+
+                    @php
+                        $myApproval = $document->documentApprovals->first();
+                    @endphp
+                    
+                    <div class="mt-3 pt-3 border-top">
+                        <strong class="text-danger">Rejection Reason:</strong>
+                        <p class="mb-0 text-muted small">{{ $myApproval->remarks }}</p>
+                    </div>
+
                 </div>
             </div>
         </div>

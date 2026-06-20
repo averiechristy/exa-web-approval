@@ -16,6 +16,7 @@ return new class extends Migration
             $table->bigInteger('document_id')->constrained('documents');
             $table->bigInteger('share_to')->constrained('users');
             $table->bigInteger('share_by')->constrained('users');
+            $table->baseColumns();
             $table->timestamps();
         });
     }

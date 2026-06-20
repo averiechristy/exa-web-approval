@@ -108,7 +108,7 @@
         </li>
 
         <li class="nav-item {{ request()->routeIs('shared.*') ? 'active' : '' }}">
-            <a class="nav-link" href="#">
+            <a class="nav-link" href="{{ route('shared.index') }}">
                 <i class="fas fa-share-alt"></i>
                 <span>Shared With Me</span>
             </a>

@@ -331,6 +331,7 @@
 
 @push('scripts')
 <script>
+
 $(document).on("click", ".btn-detail", function () {
     let id = $(this).data("id");
 
@@ -562,16 +563,67 @@ $(document).ready(function() {
         });
 
         // Organization Validation (Skipped for Super Admin)
-        if ($('#systemRoleSelect').val() != 1) {
-            $('.org-row').each(function() {
-                let org = $(this).find('.org-select');
-                let div = $(this).find('.division-select');
-                let role = $(this).find('.role-select');
+        if ($('#systemRoleSelect').val() != 1) {  // Skip kalau Super Admin
+        let orgIds = [];
+        let duplicateFound = false;
 
-                if (org.val() === '') { setError(org, 'Required'); isValid = false; }
-                if (div.val() === '') { setError(div, 'Required'); isValid = false; }
-                if (role.val() === '') { setError(role, 'Required'); isValid = false; }
+        $('.org-row').each(function() {
+            let orgSelect = $(this).find('.org-select');
+            let orgId = orgSelect.val();
+
+            // Validasi kosong
+            if (orgId === '') {
+                setError(orgSelect, 'Required');
+                isValid = false;
+            } 
+            // Validasi duplicate
+            else {
+                if (orgIds.includes(orgId)) {
+                    setError(orgSelect, 'Organization already selected');
+                    duplicateFound = true;
+                    isValid = false;
+                } else {
+                    orgIds.push(orgId);
+                }
+            }
+
+            // Division & Role tetap divalidasi
+            let div = $(this).find('.division-select');
+            let role = $(this).find('.role-select');
+
+            if (div.val() === '') { 
+                setError(div, 'Required'); 
+                isValid = false; 
+            }
+            if (role.val() === '') { 
+                setError(role, 'Required'); 
+                isValid = false; 
+            }
+        });
+
+        if (duplicateFound) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Duplicate Organization',
+                text: 'One user cannot have the same organization more than once.',
+                confirmButtonColor: '#d33'
             });
+        }
+    }
+
+        let name = $('input[name="name"]');
+        let username = $('input[name="username"]');
+        let value = name.val().trim();
+        let usernameValue = username.val().trim();
+
+        if (value.length > 20) {
+            setError(name, 'Max 24 characters allowed');
+            isValid = false;
+        }
+
+        if (usernameValue.length > 20) {
+            setError(username, 'Max 24 characters allowed');
+            isValid = false;
         }
 
         if (!isValid) return;

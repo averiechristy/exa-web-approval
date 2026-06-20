@@ -82,7 +82,7 @@
                             <label class="small font-weight-bold">Status</label>
                             <select class="form-control">
                                 <option value="">All Status</option>
-                                <option value="waiting">Waiting Approval</option>
+                                <option value="waiting">Need Approval</option>
                                 <option value="signed">Approved</option>
                                 <option value="rejected">Rejected</option>
                             </select>
@@ -152,10 +152,10 @@
                                             @if($document->status == 'DRAFT')
                                                 <span class="badge badge-secondary">Draft</span>
                                             @elseif($document->status == 'IN_PROGRESS')
-                                                <span class="badge badge-warning">Waiting Approval</span>
+                                                <span class="badge badge-warning">Need Approval</span>
                                             @elseif($document->status == 'COMPLETED')
                                                 <span class="badge badge-success">Completed</span>
-                                            @elseif($document->status == 'REJECTED')
+                                            @elseif($document->status == 'Rejected')
                                                 <span class="badge badge-danger">Rejected</span>
                                             @endif
                                         </td>

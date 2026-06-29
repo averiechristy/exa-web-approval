@@ -8,6 +8,7 @@ use App\Models\DocumentApproval;
 use App\Models\Documents;
 use App\Models\Folder;
 use App\Models\User;
+use DB;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Mail;
@@ -179,27 +180,40 @@ class InboxController extends Controller
                             ->appends(request()->query());
 
         // === Documents (kode lama kamu tetap) ===
-        $documents = Documents::with(['requester'])
-            ->where('folder_id', $folder->id)
-            ->where('organization_id', $organizationId)
-            ->where(function ($q) use ($user) {
-                // User pernah approve dokumen ini
-                $q->whereHas('documentapprovals', function ($sub) use ($user) {
-                    $sub->where('approver_id', $user->id)
-                        ->where('status', 'Approved');
-                })
-                // ATAU user adalah approver aktif saat ini
-                ->orWhereHas('documentapprovals', function ($sub) use ($user) {
-                    $sub->where('approver_id', $user->id)
-                        ->where('status', 'Pending')
-                        ->whereColumn('document_approvals.tier', 'documents.current_tier');
-                })
-                ->orWhereHas('documentapprovals', function ($sub) use ($user) {
-                    $sub->where('approver_id', $user->id)
-                        ->where('status', 'Rejected')
-                        ->whereColumn('document_approvals.tier', 'documents.current_tier');
+      $documents = Documents::with(['requester'])
+    ->where('folder_id', $folder->id)
+    ->where('organization_id', $organizationId)
+    ->where(function ($q) use ($user) {
+
+        // User pernah approve dokumen ini
+        $q->whereHas('documentapprovals', function ($sub) use ($user) {
+            $sub->where('approver_id', $user->id)
+                ->where('status', 'Approved');
+        })
+
+        // User adalah approver aktif saat ini
+        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
+            $sub->where('approver_id', $user->id)
+                ->where('status', 'Pending')
+                ->whereColumn('document_approvals.tier', 'documents.current_tier')
+                ->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))
+                        ->from('document_approvals as da2')
+                        ->whereColumn('da2.document_id', 'document_approvals.document_id')
+                        ->whereColumn('da2.tier', 'document_approvals.tier')
+                        ->whereColumn('da2.approver_order', '<', 'document_approvals.approver_order')
+                        ->where('da2.status', 'Pending');
                 });
-            }); 
+        })
+
+        // User reject di current tier
+        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
+            $sub->where('approver_id', $user->id)
+                ->where('status', 'Rejected')
+                ->whereColumn('document_approvals.tier', 'documents.current_tier');
+        });
+
+    });
 
         // === FILTERS ===
         $status = request('status');
@@ -299,7 +313,10 @@ class InboxController extends Controller
         $documentApproval = DocumentApproval::where('document_id', $id)
             ->where('approver_id', $approver->id)
             ->first();
-
+        
+        $approvalPosition = ApprovalPosition::where('document_approval_id', $documentApproval['id'])->first();
+        $placementType = $approvalPosition['mode'] ?? 'custom';
+        $isFixedMode = $placementType === 'fixed';
         if (!$documentApproval) {
             return response()->json([
                 'success' => false,
@@ -315,6 +332,14 @@ class InboxController extends Controller
         }
 
         $showOnDoc = $documentApproval->show_on_doc ?? true;
+        $requesterApproval = DocumentApproval::where('document_id', $document->id)
+            ->where('is_requester', true)
+            ->first();
+
+        $needCreateSummaryPage =
+            $isFixedMode &&
+            $showOnDoc &&
+            !$document->approval_summary_created;
         $positions = ApprovalPosition::where('document_approval_id', $documentApproval->id)->get();
 
         if ($positions->isEmpty() && $showOnDoc) {
@@ -335,6 +360,7 @@ class InboxController extends Controller
             $pdf = new Fpdi();
             $pdf->setFontSubsetting(true);
             $pageCount = $pdf->setSourceFile($originalPath);
+            $pdf->document_id = $document->id;
 
             for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
                 $pdf->AddPage();
@@ -343,6 +369,7 @@ class InboxController extends Controller
 
                 if (!$showOnDoc) continue;
 
+                if (!$isFixedMode && $showOnDoc) {
                 $size = $pdf->getTemplateSize($tplId);
                 $pageWidth = $size['width'];
                 $pageHeight = $size['height'];
@@ -365,6 +392,28 @@ if (($x + $textWidth) > $pageWidth) {
 }
 
 $pdf->Text($x, $y, $textToInsert);
+                }
+            }
+
+                if ($isFixedMode && $showOnDoc && $pageNo === $pageCount) {
+
+                   if ($needCreateSummaryPage) {
+
+                        $this->createApprovalSummaryPage(
+                            $pdf,
+                            $document,
+                            $pageCount
+                        );
+
+                        $document->approval_summary_created = true;
+                    }
+                        $this->addApproverToFixedSummary(
+                        $pdf,
+                        $approver,
+                        $approvalTime,
+                        $document
+                    );
+                    
                 }
             }
 
@@ -409,6 +458,8 @@ $pdf->Text($x, $y, $textToInsert);
                 'status'       => $documentStatus,
                 'approved_by'  => $approver->id,
                 'current_tier' => $newTier,
+                'approval_summary_created' => $document->approval_summary_created,
+                'approval_start_y' => $document->approval_start_y,
             ]);
 
             // ==================== REKOMENDASI: KIRIM EMAIL KE TIER BERIKUTNYA ====================
@@ -787,6 +838,67 @@ $pdf->Text($x, $y, $textToInsert);
         return array_reverse($breadcrumb); // dari root ke current
     }
 
+    /**
+ * Tambahkan approver baru ke bagian bawah "Approved by" di Summary Page
+ */
+/**
+ * Tambahkan approver baru ke Summary Page dengan posisi dinamis
+ * Tanpa bergantung pada kolom is_requester
+ */
+private function addApproverToFixedSummary(Fpdi $pdf, $approver, $approvalTime, $document)
+{
+    // Pindah ke halaman terakhir (Summary Page)
+    $pdf->setPage($pdf->getNumPages());
+
+    // Hitung jumlah approver yang SUDAH APPROVED (kecuali requester)
+    $approvedCount = DocumentApproval::where('document_id', $document->id)  // pakai $document dari scope luar
+        ->where('status', 'Approved')
+        ->count();
+
+    // Karena requester biasanya sudah approved duluan, kurangi 1
+    $approvedCount = max(0, $approvedCount - 1);
+
+    // Posisi dasar (sesuaikan dengan layout kamu)
+    $baseX = 10;           // mm dari kiri
+    $baseY = $document->approval_start_y;
+    $lineHeight = 6;       // jarak antar baris
+
+    $y = $baseY + ($approvedCount * $lineHeight);
+
+    $text = "{$approver->name} at {$approvalTime}";
+
+    $pdf->SetFont('helvetica', 'B', 11);
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetXY($baseX, $y);
+    $pdf->Cell(0, 8, $text, 0, 1);
+}
+
+private function createApprovalSummaryPage(Fpdi $pdf, Documents $document, int $pageCount)
+{
+    $pdf->AddPage();
+
+    $pdf->SetFont('helvetica', 'B', 18);
+    $pdf->Cell(0, 20, 'APPROVAL SUMMARY', 0, 1, 'C');
+    $pdf->Ln(10);
+
+    $pdf->SetFont('helvetica', 'B', 12);
+    $pdf->Cell(0, 10, 'Document Information', 0, 1);
+
+    $pdf->SetFont('helvetica', '', 11);
+    $pdf->Cell(0, 8, 'File Name : ' . $document->document_name, 0, 1);
+    $pdf->Cell(0, 8, 'Total Pages : ' . $pageCount . ' page(s)', 0, 1);
+
+    // kalau requester ada
+    if ($document->requester) {
+        $pdf->Cell(0, 8, 'Requester : ' . $document->requester->name, 0, 1);
+    }
+
+    $pdf->Ln(5);
+
+    $pdf->SetFont('helvetica', 'B', 12);
+    $pdf->Cell(0, 10, 'Approved by :', 0, 1);
+    $document->approval_start_y = $pdf->GetY();
+}
     public function create()
     {
         //

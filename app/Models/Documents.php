@@ -23,7 +23,9 @@ class Documents extends Model
         'current_tier',
         'email_subject',
         'email_message',
-        'flag_open'
+        'flag_open',
+        'approval_summary_created',
+        'approval_start_y'
     ];
 
     public function organization()

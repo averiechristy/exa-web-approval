@@ -333,6 +333,7 @@ class UploadController extends Controller
                         'due_at'            => $dueAt,
                         'completed_at'      => $app['status'] === 'Approved' ? now() : null,
                         'is_overdue'        => false,
+                        'is_requester' => $app['is_requester'] ?? false,
                     ]);
 
                     $approvalIdsMap[$app['temp_id']] = $docApproval->id;
@@ -453,91 +454,87 @@ class UploadController extends Controller
     /**
      * Auto apply requester signature to PDF if "Show on document" is checked
      */
-    private function applyRequesterSignature($document, $payload, $fileIndex, $approvalIdsMap)
-    {
-        $requesterApproval = collect($payload['document_approvals'])
-            ->firstWhere('is_requester', true);
+   private function applyRequesterSignature($document, $payload, $fileIndex, $approvalIdsMap)
+{
+    $requesterApproval = collect($payload['document_approvals'])
+        ->firstWhere('is_requester', true);
 
-        if (!$requesterApproval || !($requesterApproval['show_on_doc'] ?? false)) {
-            return; // Tidak perlu apply signature
-        }
-
-        $originalPath = storage_path('app/public/' . $document->path);
-        $newFilename = time() . '_req_' . basename($document->path);
-        $newPath = 'documents/approved/' . $newFilename;
-        $newFullPath = storage_path('app/public/' . $newPath);
-
-        Storage::disk('public')->makeDirectory('documents/approved');
-
-        try {
-            $pdf = new Fpdi();
-            $pdf->setFontSubsetting(true);
-            $pageCount = $pdf->setSourceFile($originalPath);
-
-            $approver = User::find($requesterApproval['approver_id']);
-            $approvalTime = now()->format('d M Y H:i');
-            $textToInsert = "Requested by {$approver->name} at {$approvalTime}";
-
-            $positions = collect($payload['file_positions'][$fileIndex]['signatures'] ?? [])
-                ->where('approver_temp_id', $requesterApproval['temp_id']);
-
-            for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
-                $pdf->AddPage();
-                $tplId = $pdf->importPage($pageNo);
-                $pdf->useTemplate($tplId, 0, 0, null, null, true);
-
-                $size = $pdf->getTemplateSize($tplId);
-                $pageWidth = $size['width'];
-                $pageHeight = $size['height'];
-
-                $paddingY = 2;
-                // Apply signature requester di halaman yang sesuai
-                foreach ($positions as $pos) {
-                    if ((int)$pos['page_number'] !== $pageNo) continue;
-                    \Log::info([
-                        'page_no' => $pageNo,
-                        'target_page' => $pos['page_number'],
-                    ]);
-
-                    $x = $pos['pos_x_percent'] * $pageWidth;
-                    $y = ($pos['pos_y_percent'] * $pageHeight) + $paddingY;
-
-
-                    \Log::info('Writing approved text at x: ' . $x . ', y: ' . $y);
-                    \Log::info('Page width: ' . $pageWidth . ', Page height: ' . $pageHeight);
-                    \Log::info('Text to insert: ' . $textToInsert);
-
-                    $pdf->SetFont('helvetica', 'B', 11);
-                    $pdf->SetTextColor(0, 128, 0);
-                    $paddingY = 2;
-                    
-                    $pdf->SetXY($x, $y);
-                    \Log::info('Current Y before write: '.$pdf->GetY());
-                    $pdf->SetAutoPageBreak(false);
-                    
-                    $textWidth = $pdf->GetStringWidth($textToInsert);
-
-                    if (($x + $textWidth) > $pageWidth) {
-                        $x = $pageWidth - $textWidth - 5;
-                    }
-
-                    $pdf->Text($x, $y, $textToInsert);
-                    
-                }
-            }
-
-            $pdf->Output($newFullPath, 'F');
-
-            // Update document path dengan PDF yang sudah ada signature requester
-            $document->update([
-                'path' => $newPath,
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Requester Signature Error: ' . $e->getMessage());
-            // Tidak throw, biarkan proses store tetap berhasil
-        }
+    if (!$requesterApproval || !($requesterApproval['show_on_doc'] ?? false)) {
+        return;
     }
+
+    $placementType = $payload['placement_type'] ?? 'custom';
+    $isFixedMode = $placementType === 'fixed';
+
+    $originalPath = storage_path('app/public/' . $document->path);
+    $newFilename = time() . ($isFixedMode ? '_summary_' : '_req_') . basename($document->path);
+    $newPath = 'documents/approved/' . $newFilename;
+    $newFullPath = storage_path('app/public/' . $newPath);
+
+    Storage::disk('public')->makeDirectory('documents/approved', 0755, true);
+
+    try {
+        $pdf = new Fpdi();
+        $pdf->setFontSubsetting(true);
+        $pageCount = $pdf->setSourceFile($originalPath);
+
+        $approver = User::find($requesterApproval['approver_id']);
+        $approvalTime = now()->format('d M Y H:i');
+
+        // ==================== HALAMAN ASLI ====================
+        for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+            $pdf->AddPage();
+            $tplId = $pdf->importPage($pageNo);
+            $pdf->useTemplate($tplId, 0, 0, null, null, true);
+
+            if ($isFixedMode) continue; // Fixed mode tidak taruh di halaman asli
+        }
+
+        // ===================== FIXED MODE: SUMMARY PAGE (Awal) =====================
+        if ($isFixedMode) {
+            $pdf->AddPage();
+
+            $pdf->SetFont('helvetica', 'B', 18);
+            $pdf->Cell(0, 20, 'APPROVAL SUMMARY', 0, 1, 'C');
+            $pdf->Ln(10);
+
+            $pdf->SetFont('helvetica', 'B', 12);
+            $pdf->Cell(0, 10, 'Document Information', 0, 1);
+            $pdf->SetFont('helvetica', '', 11);
+            
+            $fileName = $document->document_name;
+            $pdf->Cell(0, 8, 'File Name : ' . $fileName, 0, 1);
+            $pdf->Cell(0, 8, 'Total Pages : ' . $pageCount . ' page(s)', 0, 1);
+            $pdf->Ln(12);
+
+            // Requested By
+                // Requested By
+                $pdf->SetFont('helvetica', 'B', 12);
+                $pdf->Cell(0, 10, 'Requested by : ' . $approver->name, 0, 1);
+                $pdf->SetFont('helvetica', '', 11);
+                $pdf->Cell(0, 8, 'Date : ' . $approvalTime, 0, 1);
+                $pdf->Ln(15);
+
+            // Approved By - Kosong dulu
+            $pdf->SetFont('helvetica', 'B', 12);
+            $pdf->Cell(0, 10, 'Approved by :', 0, 1);
+            $pdf->SetFont('helvetica', '', 11);
+
+            $approvalStartY = $pdf->GetY();
+
+        }
+
+        $pdf->Output($newFullPath, 'F');
+        $document->update([
+            'approval_summary_created' => true,
+            'approval_start_y' => $approvalStartY,
+        ]);
+        $document->update(['path' => $newPath]);
+
+    } catch (\Exception $e) {
+        \Log::error('Requester Signature Error: ' . $e->getMessage());
+    }
+}
     /**
      * Display the specified resource.
      */

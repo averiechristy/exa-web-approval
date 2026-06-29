@@ -1020,11 +1020,13 @@ function renderSignerListFromStep2() {
                         </h6>
                         <div class="approvers-list" data-tier="${tier}" data-division-id="${group.division_id || ''}"></div>
                         
-                        ${!isTierZero ? `
-                        <button type="button" class="btn btn-outline-primary btn-sm mt-2 add-approver-per-tier"
-                                data-tier="${tier}" data-division-id="${group.division_id || ''}">
+                        ${`
+                        <button type="button"
+                                class="btn btn-outline-primary btn-sm mt-2 add-approver-per-tier"
+                                data-tier="${tier}"
+                                data-division-id="${group.division_id || ''}">
                             <i class="fas fa-plus"></i> Add Approver
-                        </button>` : ''}
+                        </button>`}
                     </div>`;
 
                     $('#tierContainer').append(tierHtml);
@@ -1577,6 +1579,13 @@ function renderRequesterSection() {
         const currentFile = uploadedFiles[activeFileIndex];
         const currentPageNum = currentPage;
         
+        const placementType = document.querySelector('input[name="placementType"]:checked')?.value || 'custom';
+
+    // Jika bukan custom mode → selalu disable
+    if (placementType !== 'custom') {
+        disableSignerPanel();
+        return;
+    }
         if (!currentFile) return;
         
         console.log(`Updating signer UI for page ${currentPageNum}, usedSigners:`, Array.from(currentFile.usedSigners));
@@ -1693,26 +1702,21 @@ function renderRequesterSection() {
         });
     }
     else if(type === 'fixed') {
-        const lastPage = file.totalPages;
+    showOnDocApprovers.forEach((approver, index) => {
+        const summaryPage = file.totalPages + 1;
         
-        // Konfigurasi offset - sama seperti applyStandardFixedSignatures
-        const startY = 0.95;
-        const stepY = 0.02;
-
-        showOnDocApprovers.forEach((approver, index) => {
-            let yPos = startY - (index * stepY);
-
-            fileData.signatures.push({
-                approver_id: approver.user_id,
-                division_id: approver.division_id,
-                tier: approver.tier,
-                page_number: lastPage,
-                pos_x_percent: 0.02,
-                pos_y_percent: yPos,
-                mode: 'fixed'
-            });
+        fileData.signatures.push({
+            approver_id: approver.user_id,
+            division_id: approver.division_id,
+            tier: approver.tier,
+            page_number: summaryPage,
+            pos_x_percent: 0.08,
+            pos_y_percent: 0.75 - (index * 0.08),
+            mode: 'fixed',
+            is_summary_page: true
         });
-    }
+    });
+}
             
             return fileData;
         });
@@ -1845,7 +1849,12 @@ function collectStep2Data() {
                 // ✅ Enable signer panel
                 enableSignerPanel();
             } 
-            else if (type === 'standard' || type === 'fixed') {
+            else if (type === 'standard') {            
+                // 🔥 STANDARD/FIXED: Generate auto signatures
+                disableSignerPanel();
+                applyStandardFixedSignatures(type);
+            }
+            else if (type === 'fixed') {            
                 // 🔥 STANDARD/FIXED: Generate auto signatures
                 disableSignerPanel();
                 applyStandardFixedSignatures(type);
@@ -1912,38 +1921,27 @@ function collectStep2Data() {
                 }
             } 
             else if (mode === 'fixed') {
-                const lastPage = file.totalPages;
-                
-                // =================================================
-                // VERTIKAL STACKING - Mulai dari tengah-kiri
-                // =================================================
-                const baseX = 70;        // Ubah dari 85 → 70 (30% dari kanan)
-                const startY = 90;        // 10% dari bawah
-                const stepY = 12;         // jarak vertikal antar signature
-                const stepX = 15;        // jarak horizontal jika sudah penegak
-                
-                showOnDocApprovers.forEach((approver, index) => {
-                    let xPos = baseX;
-                    let yPos = startY - (index * stepY);
-                    
-                    // Kalo sudah melampaui batas bawah (yPos < 20), geser kiri dan mulai dari atas lagi
-                    if (yPos < 20) {
-                        xPos = baseX - (Math.floor(index / 6) * stepX);
-                        yPos = 90 - ((index % 6) * stepY);
-                    }
+            // FIXED = Approval Summary Page di akhir
+            const summaryPage = file.totalPages + 1;
 
-                    file.signatures.push({
-                        signer_id: approver.id,
-                        signer_name: approver.name,
-                        tier: approver.tier,
-                        page: lastPage,
-                        x_percent: xPos,
-                        y_percent: yPos,
-                        mode: 'fixed'
-                    });
-                    file.usedSigners.add(approver.id);
+            // Simpan informasi bahwa ada summary page
+            file.hasSummaryPage = true;
+            file.summaryPageNumber = summaryPage;
+
+            showOnDocApprovers.forEach((approver, index) => {
+                file.signatures.push({
+                    signer_id: approver.id,
+                    signer_name: approver.name,
+                    tier: approver.tier,
+                    page: summaryPage,
+                    x_percent: 0.08,
+                    y_percent: 0.75 - (index * 0.08), // stacking vertikal
+                    mode: 'fixed',
+                    is_summary: true
                 });
-            }
+                file.usedSigners.add(approver.id);
+            });
+        }
         });
 
         updateSignerUIForCurrentFile();
@@ -1957,12 +1955,7 @@ function collectStep2Data() {
         });
     }
 
-    function disableSignerPanel() {
-        document.querySelectorAll('.signer-item').forEach(item => {
-            item.style.opacity = 0.5;
-            item.style.pointerEvents = 'none';
-        });
-    }
+
 
     // ================= FILE MANAGEMENT =================
     function renderFileList() {

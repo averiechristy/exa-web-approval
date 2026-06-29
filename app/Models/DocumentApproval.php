@@ -26,7 +26,8 @@ class DocumentApproval extends Model
         'completed_at',
         'is_overdue',
         'tier',
-        'workflow_step_id'
+        'workflow_step_id',
+        'is_requester'
     ];
 
     public function document()

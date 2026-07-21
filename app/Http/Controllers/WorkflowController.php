@@ -100,10 +100,15 @@ public function edit($id)
      */
     public function destroy(Workflow $workflow)
     {
-        $this->workflowService->deleteWorkflow($workflow);
+        try {
+            $this->workflowService->deleteWorkflow($workflow);
 
-        return redirect()->route('workflow.index')
-            ->with('success', 'Success Delete Data');
+            return redirect()->route('workflow.index')
+                ->with('success', 'Success Delete Data');
+        } catch (\Exception $e) {
+            return redirect()->route('workflow.index')
+                ->with('error', $e->getMessage());
+        }
     }
 
     public function getSteps($id)

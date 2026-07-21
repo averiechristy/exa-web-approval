@@ -32,4 +32,9 @@ class Workflow extends Model
         return $this->hasMany(WorkflowStep::class);
     }
 
+    public function documents()
+    {
+        return $this->hasMany(Documents::class, 'workflow_id');
+    }
+
 }

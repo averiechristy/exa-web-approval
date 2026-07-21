@@ -93,6 +93,14 @@ class FolderService
 
     public function deleteFolder(Folder $folder)
     {
+
+        if (
+            $folder->children()->exists() ||
+            $folder->document()->exists()
+        ) {
+            throw new \Exception('Folder cannot be deleted because it is already used.');
+        }
+
         $folder->load([
             'organization',
             'parent',

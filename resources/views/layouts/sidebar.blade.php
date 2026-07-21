@@ -5,7 +5,7 @@
 
 <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
 
-    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('dashboard') }}">
+    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('dashboard.sla') }}">
         <div class="sidebar-brand-text mx-3">EXA E-APPROVAL</div>
     </a>
 
@@ -13,8 +13,8 @@
 
     {{-- DASHBOARD --}}
     @if(!$isSuperadmin)
-    <li class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-        <a class="nav-link" href="{{ route('dashboard') }}">
+    <li class="nav-item {{ request()->routeIs('dashboard.sla') ? 'active' : '' }}">
+        <a class="nav-link" href="{{ route('dashboard.sla') }}">
             <span>Dashboard</span>
         </a>
     </li>
@@ -37,7 +37,7 @@
         </div>
 
         <li class="nav-item {{ $isMasterActive ? 'active' : '' }}">
-            <a class="nav-link collapsed {{ $isMasterActive ? '' : 'collapsed' }}"
+            <a class="nav-link {{ $isMasterActive ? '' : 'collapsed' }}"
                href="#"
                data-toggle="collapse"
                data-target="#collapseMaster"
@@ -86,12 +86,29 @@
             </div>
         </li>
 
+        <!-- AUDIT TRAIL ADDITION -->
+        <div class="sidebar-heading">
+            Logs
+        </div>
+
+        <li class="nav-item {{ request()->routeIs('audit-trail.*') ? 'active' : '' }}">
+            <a class="nav-link" href="{{ route('audit-trail.index') }}">
+                <i class="fas fa-history"></i>
+                <span>Activity Log</span>
+            </a>
+        </li>
+
         <hr class="sidebar-divider">
     @endif
 
     {{-- USER MENU --}}
     @if(!$isSuperadmin)
-        <div class="sidebar-heading">My Documents</div>
+        <li class="nav-item {{ request()->routeIs('mydoc.*') ? 'active' : '' }}">
+            <a class="nav-link" href="{{ route('mydoc.index') }}">
+                <i class="fas fa-folder"></i>
+                <span>My Document</span>
+            </a>
+        </li>
 
         <li class="nav-item {{ request()->routeIs('inbox.*') ? 'active' : '' }}">
             <a class="nav-link" href="{{ route('inbox.index') }}">
@@ -101,7 +118,7 @@
         </li>
 
         <li class="nav-item {{ request()->routeIs('sent.*') ? 'active' : '' }}">
-            <a class="nav-link" href="#">
+            <a class="nav-link" href="{{ route('sent.index') }}">
                 <i class="fas fa-paper-plane"></i>
                 <span>Sent</span>
             </a>

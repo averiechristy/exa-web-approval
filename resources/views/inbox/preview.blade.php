@@ -30,7 +30,7 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <a href="{{ route('inbox.show', $folder->id ?? '') }}" class="btn btn-light btn-sm mb-2">
+            <a href="{{ route('inbox.index')}}" class="btn btn-light btn-sm mb-2">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
             <h4 class="mb-0">{{ $document->document_name }}</h4>
@@ -123,7 +123,7 @@
                     
                     <div class="mt-3 pt-3 border-top">
                         <strong class="text-danger">Rejection Reason:</strong>
-                        <p class="mb-0 text-muted small">{{ $myApproval->remarks }}</p>
+                        <p class="mb-0 text-muted small">{{ $myApproval->remarks ?? '-'}}</p>
                     </div>
 
                 </div>

@@ -154,6 +154,13 @@ class WorkflowService
 
     public function deleteWorkflow(Workflow $workflow)
     {
+
+        if (
+            $workflow->workflowstep()->exists() ||
+            $workflow->documents()->exists()
+        ) {
+            throw new \Exception('Workflow cannot be deleted because it is already used.');
+        }
         $workflow->load([
             'organization',
             'steps.division',

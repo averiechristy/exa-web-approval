@@ -21,4 +21,11 @@ class DocumentShare extends Model
     {
         return $this->belongsTo(Documents::class, 'document_id');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'share_to');
+    }
+
+    
 }

@@ -83,9 +83,14 @@ class OrganizationController extends Controller
      */
     public function destroy(Organization $organization)
     {
-        $this->organizationService->deleteOrganization($organization);
+        try {
+            $this->organizationService->deleteOrganization($organization);
 
-        return redirect()->route('organization.index')
-            ->with('success', 'Success Delete Data');
+            return redirect()->route('organization.index')
+                ->with('success', 'Success Delete Data');
+        } catch (\Exception $e) {
+            return redirect()->route('organization.index')
+                ->with('error', $e->getMessage());
+        }
     }
 }

@@ -46,7 +46,7 @@ class User extends Authenticatable
 
     public function documentapproval()
     {
-        return $this->hasMany(DocumentApproval::class);
+        return $this->hasMany(DocumentApproval::class, 'approver_id');
     }
 
     public function systemRole()

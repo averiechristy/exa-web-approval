@@ -46,11 +46,16 @@ class FolderController extends Controller
             ->with('success', 'Success Update Data');
     }
 
-    public function destroy(Folder $folder)
-    {
+public function destroy(Folder $folder)
+{
+    try {
         $this->folderService->deleteFolder($folder);
 
         return redirect()->route('folders.index')
             ->with('success', 'Success Delete Data');
+    } catch (\Exception $e) {
+        return redirect()->route('folders.index')
+            ->with('error', $e->getMessage());
     }
+}
 }

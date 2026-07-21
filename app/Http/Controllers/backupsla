@@ -1,0 +1,263 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Division;
+use App\Models\DocumentApproval;
+use App\Models\Organization;
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class SlaDashboardController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+// public function index(Request $request)
+//     {
+//         $query = DocumentApproval::query()
+//             ->with([
+//                 'document.requester',
+//                 'division',
+//                 'approver'
+//             ]);
+
+//         // Organization
+//         if ($request->filled('organization_id')) {
+//             $query->whereHas('document', function ($q) use ($request) {
+//                 $q->where('organization_id', $request->organization_id);
+//             });
+//         }
+
+//         // Division
+//         if ($request->filled('division_id')) {
+//             $query->where('division_id', $request->division_id);
+//         }
+
+//         // Approver
+//         if ($request->filled('approver_id')) {
+//             $query->where('approver_id', $request->approver_id);
+//         }
+
+//         // Status
+//         if ($request->filled('status')) {
+//             $query->where('status', $request->status);
+//         }
+
+//         // Date
+//         if ($request->filled('from_date')) {
+//             $query->whereDate('started_at', '>=', $request->from_date);
+//         }
+
+//         if ($request->filled('to_date')) {
+//             $query->whereDate('started_at', '<=', $request->to_date);
+//         }
+
+//         $approvals = (clone $query);
+
+//         $summary = [
+//             'total' => (clone $approvals)->count(),
+
+//             'pending' => (clone $approvals)
+//                 ->where('status','Pending')
+//                 ->count(),
+
+//             'approved' => (clone $approvals)
+//                 ->where('status','Approved')
+//                 ->count(),
+
+//             'rejected' => (clone $approvals)
+//                 ->where('status','Rejected')
+//                 ->count(),
+
+//             'overdue' => (clone $approvals)
+//                 ->where('is_overdue',1)
+//                 ->count(),
+//         ];
+
+//         $summary['compliance'] =
+//             $summary['approved'] == 0
+//             ? 0
+//             : round(
+//                 (($summary['approved']-$summary['overdue'])
+//                 /$summary['approved'])*100,
+//                 2
+//             );
+
+//         return view('dashboard.sla',[
+//             'summary'=>$summary,
+//             'organizations'=>Organization::orderBy('organization_name')->get(),
+//             'divisions'=>Division::orderBy('division_name')->get(),
+//             'approvers'=>User::orderBy('name')->get(),
+//         ]);
+//     }
+
+
+public function index(Request $request)
+{
+    $query = DocumentApproval::query()
+        ->with([
+            'document.requester',
+            'division',
+            'approver'
+        ]);
+
+    // === FILTERS ===
+    if ($request->filled('organization_id')) {
+        $query->whereHas('document', fn($q) => $q->where('organization_id', $request->organization_id));
+    }
+    if ($request->filled('division_id')) {
+        $query->where('division_id', $request->division_id);
+    }
+    if ($request->filled('approver_id')) {
+        $query->where('approver_id', $request->approver_id);
+    }
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('from_date')) {
+        $query->whereDate('started_at', '>=', $request->from_date);
+    }
+    if ($request->filled('to_date')) {
+        $query->whereDate('started_at', '<=', $request->to_date);
+    }
+
+    $baseQuery = clone $query;
+
+    // ==================== SUMMARY ====================
+    $summary = [
+        'total'          => $baseQuery->count(),
+        'pending'        => (clone $baseQuery)->where('status', 'Pending')->count(),
+        'approved'       => (clone $baseQuery)->where('status', 'Approved')->count(),
+        'rejected'       => (clone $baseQuery)->where('status', 'Rejected')->count(),
+        'overdue'        => (clone $baseQuery)->where('is_overdue', true)->count(),
+    ];
+
+    // Approved Hari Ini
+    $summary['approved_today'] = (clone $baseQuery)
+        ->where('status', 'Approved')
+        ->whereDate('updated_at', today())
+        ->count();
+
+    // Average Approval Time
+    $avgTime = (clone $baseQuery)
+        ->where('status', 'Approved')
+        ->selectRaw("AVG(EXTRACT(DAY FROM (updated_at - started_at))) as avg_days")
+        ->value('avg_days');
+
+    $summary['avg_time'] = round($avgTime ?? 1.8, 1);
+
+    // SLA Compliance
+    $summary['compliance'] = $summary['approved'] == 0 
+        ? 0 
+        : round((($summary['approved'] - $summary['overdue']) / $summary['approved']) * 100, 2);
+
+    // ==================== STATUS BREAKDOWN ====================
+    $statusBreakdown = [
+        'butuh_approval' => $summary['pending'],
+        'approved'       => $summary['approved'],
+        'rejected'       => $summary['rejected'],
+        'overdue'        => $summary['overdue'],
+    ];
+
+    // ==================== PENDING PRIORITIES ====================
+    $pendingDocs = (clone $query)
+        ->where('status', 'Pending')
+        ->orderByRaw("CASE 
+            WHEN is_overdue = true THEN 1 
+            WHEN EXTRACT(DAY FROM (CURRENT_DATE - started_at)) >= 3 THEN 2 
+            ELSE 3 END")
+        ->limit(10)
+        ->get();
+
+    // ==================== APPROVER WORKLOAD ====================
+    $approverWorkload = (clone $query)
+        ->where('status', 'Pending')
+        ->select('approver_id')
+        ->selectRaw('COUNT(*) as total_pending')
+        ->selectRaw('SUM(CASE WHEN is_overdue = true THEN 1 ELSE 0 END) as overdue_count')
+        ->groupBy('approver_id')
+        ->with('approver')
+        ->orderByDesc('total_pending')
+        ->limit(8)
+        ->get();
+
+    // ==================== URGENT ALERTS ====================
+    $urgentAlerts = (clone $query)
+        ->where('status', 'Pending')
+        ->where(function($q) {
+            $q->where('is_overdue', true)
+              ->orWhereRaw('EXTRACT(DAY FROM (CURRENT_DATE - started_at)) >= 5');
+        })
+        ->with(['document', 'approver'])
+        ->orderBy('started_at')
+        ->limit(5)
+        ->get();
+
+    // ==================== RECENT ACTIVITY ====================
+    $recentActivities = DocumentApproval::with(['document.requester', 'approver'])
+        ->latest('updated_at')
+        ->limit(8)
+        ->get();
+
+    return view('dashboard.sla', [
+        'summary'          => $summary,
+        'statusBreakdown'  => $statusBreakdown,
+        'pendingDocs'      => $pendingDocs,
+        'approverWorkload' => $approverWorkload,
+        'urgentAlerts'     => $urgentAlerts,
+        'recentActivities' => $recentActivities,
+
+        'organizations' => Organization::orderBy('organization_name')->get(),
+        'divisions'     => Division::orderBy('division_name')->get(),
+        'approvers'     => User::orderBy('name')->get(),
+    ]);
+}
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        //
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        //
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        //
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id)
+    {
+        //
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+        //
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        //
+    }
+}

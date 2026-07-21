@@ -27,10 +27,23 @@ class Folder extends Model
         return $this->hasMany(Documents::class);
     }
 
-    public function parent()
-    {
-        return $this->belongsTo(Folder::class, 'parent_id');
+public function parent()
+{
+    return $this->belongsTo(Folder::class, 'parent_id');
+}
+
+public function getFullPathAttribute()
+{
+    $folder = $this;
+    $names = [];
+
+    while ($folder) {
+        array_unshift($names, $folder->folder_name);
+        $folder = $folder->parent;
     }
+
+    return implode(' / ', $names);
+}
 
    public function children()
     {

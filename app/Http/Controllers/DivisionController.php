@@ -81,9 +81,14 @@ class DivisionController extends Controller
      */
     public function destroy(Division $division)
     {
-        $this->divisionService->deleteDivision($division);
+        try {
+            $this->divisionService->deleteDivision($division);
 
-        return redirect()->route('division.index')
-            ->with('success', 'Success Delete Data');
+            return redirect()->route('division.index')
+                ->with('success', 'Success Delete Data');
+        } catch (\Exception $e) {
+            return redirect()->route('division.index')
+                ->with('error', $e->getMessage());
+        }
     }
 }

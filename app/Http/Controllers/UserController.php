@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UserRequest;
+use App\Jobs\LogActivityJob;
 use App\Models\Division;
 use App\Models\Organization;
 use App\Models\Role;
@@ -10,6 +11,8 @@ use App\Models\SystemRole;
 use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
@@ -171,12 +174,114 @@ class UserController extends Controller
     /**
      * Remove the specified resource from storage.
      */
+
+public function resetPassword(User $user)
+    {
+        try {
+            $user->update([
+                'password' => Hash::make('12345678'),
+            ]);
+
+            // Load relasi agar data di log lengkap
+            $user->load(['systemRole', 'userAccesses.organization', 'userAccesses.division', 'userAccesses.role', 'userAccesses.manager']);
+
+            // Dispatch Activity Log for Reset Password
+            LogActivityJob::dispatchSync(
+                logName: 'user',
+                causedBy: auth()->user(),
+                performedOn: $user,
+                event: 'user.reset_password',
+                description: 'Reset Password User',
+                properties: [
+                    'attributes' => [
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'username' => $user->username,
+                        'system_role' => $user->systemRole?->system_role_name,
+                        'is_active' => $user->is_active ? 'Active' : 'Inactive',
+                        'access' => $user->userAccesses->map(function ($access) {
+                            return [
+                                'organization' => $access->organization?->organization_name,
+                                'division' => $access->division?->division_name,
+                                'role' => $access->role?->role_name,
+                                'manager' => $access->manager?->name,
+                            ];
+                        })->values(),
+                    ],
+                ],
+            );
+
+            return redirect()->route('user.index')
+                ->with('success', 'Password for user ' . $user->username . ' has been reset to 12345678.');
+        } catch (\Exception $e) {
+            return redirect()->route('user.index')
+                ->with('error', 'Failed to reset password.');
+        }
+    }
+
+    /**
+     * Set user status to inactive
+     */
+    public function inactive(User $user)
+    {
+        // Guard: Prevent self-deactivation
+        if (Auth::id() === $user->id) {
+            return redirect()->route('user.index')
+                ->with('error', 'You cannot deactivate your own account.');
+        }
+
+        try {
+            $user->update([
+                'is_active' => 0,
+            ]);
+
+            // Load relasi agar data di log lengkap
+            $user->load(['systemRole', 'userAccesses.organization', 'userAccesses.division', 'userAccesses.role', 'userAccesses.manager']);
+
+            // Dispatch Activity Log for Inactive User
+            LogActivityJob::dispatchSync(
+                logName: 'user',
+                causedBy: auth()->user(),
+                performedOn: $user,
+                event: 'user.inactivated',
+                description: 'Inactivate User',
+                properties: [
+                    'attributes' => [
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'username' => $user->username,
+                        'system_role' => $user->systemRole?->system_role_name,
+                        'is_active' => 'Inactive',
+                        'access' => $user->userAccesses->map(function ($access) {
+                            return [
+                                'organization' => $access->organization?->organization_name,
+                                'division' => $access->division?->division_name,
+                                'role' => $access->role?->role_name,
+                                'manager' => $access->manager?->name,
+                            ];
+                        })->values(),
+                    ],
+                ],
+            );
+
+            return redirect()->route('user.index')
+                ->with('success', 'User ' . $user->username . ' has been set to inactive.');
+        } catch (\Exception $e) {
+            return redirect()->route('user.index')
+                ->with('error', 'Failed to deactivate user.');
+        }
+    }
     public function destroy(User $user)
     {
-        $this->userService->deleteUser($user);
+        try {
+            $this->userService->deleteUser($user);
 
-        return redirect()->route('user.index')
-            ->with('success', 'Success Delete Data');
+            return redirect()->route('user.index')
+                ->with('success', 'Success Delete Data');
+        } catch (\Exception $e) {
+            return redirect()->route('user.index')
+                ->with('error', $e->getMessage());
+        }
     }
 
 }

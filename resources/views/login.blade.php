@@ -55,14 +55,22 @@
                             >
                         </div>
 
-                        <div class="form-group mb-4">
+                        <div class="form-group mb-4 position-relative">
                             <input
                                 type="password"
                                 name="password"
-                                class="form-control form-control-user"
+                                id="password"
+                                class="form-control form-control-user pr-5"
                                 placeholder="Password"
                                 required
                             >
+
+                            <span
+                                id="togglePassword"
+                                style="position:absolute; right:18px; top:50%; transform:translateY(-50%); cursor:pointer; color:#6c757d;"
+                            >
+                                <i class="fas fa-eye"></i>
+                            </span>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-user btn-block">
@@ -79,6 +87,23 @@
 
 </body>
 
+<script>
+    const password = document.getElementById('password');
+    const togglePassword = document.getElementById('togglePassword');
 
+    togglePassword.addEventListener('click', function () {
+        const icon = this.querySelector('i');
+
+        if (password.type === 'password') {
+            password.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            password.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    });
+</script>
 
 </html>

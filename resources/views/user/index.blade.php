@@ -30,52 +30,80 @@
             </div>
 
             {{-- TABLE SECTION --}}
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>Name</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Detail</th>
-                            <th width="150" class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($user as $item)
-                            <tr>
-                                <td>{{ $item->name }}</td>
-                                <td>{{ $item->username }}</td>
-                                <td>{{ $item->email }}</td>
-                                <td>
-                                    <button type="button" class="btn btn-link btn-detail" data-id="{{ $item->id }}">
-                                        See Detail
-                                    </button>
-                                </td>
-                                <td class="text-center">
-                                    <button class="btn btn-sm btn-light edit-btn" data-id="{{ $item->id }}">
-                                        <i class="fas fa-edit text-primary"></i>
-                                    </button>
-                                    <button 
-                                        class="btn btn-sm btn-light deleteBtn" 
-                                        data-id="{{ $item->id }}"
-                                        data-username="{{ $item->username }}"
-                                        data-toggle="modal" 
-                                        data-target="#deleteModal"
-                                    >
-                                        <i class="fas fa-trash text-danger"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">No data available</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+<div class="table-responsive">
+    <table class="table table-bordered">
+        <thead class="bg-light">
+            <tr>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th class="text-center">Status</th>
+                <th>Detail</th>
+                <th width="180" class="text-center">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($user as $item)
+                <tr>
+                    <td>{{ $item->name }}</td>
+                    <td>{{ $item->username }}</td>
+                    <td>{{ $item->email }}</td>
+                    
+                    {{-- KOLOM STATUS BADGE --}}
+                    <td class="text-center align-middle">
+                        @if ($item->is_active)
+                            <span class="badge badge-success px-2 py-1">Active</span>
+                        @else
+                            <span class="badge badge-secondary px-2 py-1">Inactive</span>
+                        @endif
+                    </td>
 
+                    <td>
+                        <button type="button" class="btn btn-link btn-detail" data-id="{{ $item->id }}">
+                            See Detail
+                        </button>
+                    </td>
+                    <td class="text-center">
+                        {{-- Edit Button --}}
+                        <button class="btn btn-sm btn-light edit-btn" data-id="{{ $item->id }}" title="Edit">
+                            <i class="fas fa-edit text-primary"></i>
+                        </button>
+
+                        {{-- Reset Password Button --}}
+                        <button class="btn btn-sm btn-light resetPasswordBtn" 
+                                data-id="{{ $item->id }}" 
+                                data-username="{{ $item->username }}" 
+                                title="Reset Password">
+                            <i class="fas fa-key text-warning"></i>
+                        </button>
+
+                        {{-- Inactive Button --}}
+                        <button class="btn btn-sm btn-light inactiveBtn" 
+                                data-id="{{ $item->id }}" 
+                                data-username="{{ $item->username }}" 
+                                title="{{ auth()->id() == $item->id ? 'You cannot deactivate yourself' : 'Inactive User' }}"
+                                {{ auth()->id() == $item->id || !$item->is_active ? 'disabled' : '' }}>
+                            <i class="fas fa-user-slash {{ auth()->id() == $item->id || !$item->is_active ? 'text-muted' : 'text-secondary' }}"></i>
+                        </button>
+
+                        {{-- Delete Button --}}
+                        <button class="btn btn-sm btn-light deleteBtn" 
+                                data-id="{{ $item->id }}" 
+                                data-username="{{ $item->username }}" 
+                                title="Delete">
+                            <i class="fas fa-trash text-danger"></i>
+                        </button>
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    {{-- colspan diubah ke 6 karena bertambah 1 kolom --}}
+                    <td colspan="6" class="text-center text-muted">No data available</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+</div>
             {{-- FOOTER: Pagination & PerPage --}}
             <div class="d-flex justify-content-between align-items-center mt-3">
                 <div class="d-flex align-items-center">
@@ -327,6 +355,15 @@
     @method('DELETE')
 </form>
 
+<!-- Form Hidden untuk Reset Password -->
+<form id="globalResetPasswordForm" method="POST" style="display:none;">
+    @csrf
+</form>
+
+<!-- Form Hidden untuk Inactive User -->
+<form id="globalInactiveForm" method="POST" style="display:none;">
+    @csrf
+</form>
 @endsection
 
 @push('scripts')
@@ -1081,6 +1118,54 @@ $(document).ready(function() {
     });
     
         
+        // --- RESET PASSWORD HANDLER ---
+// --- RESET PASSWORD HANDLER ---
+    $('.resetPasswordBtn').on('click', function() {
+        let id = $(this).data('id');
+        let username = $(this).data('username');
+
+        Swal.fire({
+            title: 'Reset Password?',
+            text: `Password for user "${username}" will be reset to default: 12345678.`,
+            icon: 'warning',
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonColor: '#f6c23e',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Reset!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                let form = $('#globalResetPasswordForm');
+                form.attr('action', '/user/' + id + '/reset-password');
+                form.submit();
+            }
+        });
+    });
+
+    // --- INACTIVE USER HANDLER ---
+    $('.inactiveBtn').on('click', function() {
+        let id = $(this).data('id');
+        let username = $(this).data('username');
+
+        Swal.fire({
+            title: 'Deactivate User?',
+            text: `User "${username}" will be set to inactive.`,
+            icon: 'warning',
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonColor: '#e74a3b',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Deactivate!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                let form = $('#globalInactiveForm');
+                form.attr('action', '/user/' + id + '/inactive');
+                form.submit();
+            }
+        });
+    });
 });
 </script>
 @endpush

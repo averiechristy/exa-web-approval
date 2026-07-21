@@ -41,7 +41,9 @@ class UserService
             });
         }
 
-        return $query->paginate($perPage)->withQueryString();
+        return $query->latest()
+                 ->paginate($perPage)
+                 ->withQueryString();
     }
     public function createUser($data)
     {
@@ -191,6 +193,29 @@ class UserService
 
     public function deleteUser(User $user)
     {
+        if (auth()->id() === $user->id) {
+            throw new \Exception('You cannot delete your own account.');
+        }
+
+        // Tidak boleh menghapus Superadmin terakhir
+        if ($user->isSuperadmin()) {
+            $superadminCount = User::where('system_role_id', 1)
+                ->whereNull('deleted_at')
+                ->count();
+
+            if ($superadminCount <= 1) {
+                throw new \Exception('The last Superadmin cannot be deleted.');
+            }
+        }
+
+        // Tidak boleh dihapus jika masih digunakan
+        if (
+            $user->userAccesses()->exists() ||
+            $user->documentApprovals()->exists()
+        ) {
+            throw new \Exception('User cannot be deleted because it is already used.');
+        }
+
         $user->load([
             'systemRole',
             'userAccesses.organization',

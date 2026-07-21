@@ -1,0 +1,249 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Documents;
+use Illuminate\Http\Request;
+use App\Models\DocumentApproval;
+use App\Models\Organization;
+use App\Models\Division;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+
+class SlaDashboardController extends Controller
+{
+public function index(Request $request)
+{
+    $activeOrgId = session('active_organization_id');
+    $authUserId = auth()->id();
+
+    // 1. Ambil data akses user yang sedang login di organisasi aktif saat ini
+    $currentAccess = \App\Models\UserAccess::with('role')
+        ->where('user_id', $authUserId)
+        ->where('organization_id', $activeOrgId)
+        ->first();
+
+    $showStaffFilter = false;
+    $staffUsers = collect();
+
+    if ($currentAccess && $currentAccess->role) {
+        $roleName = strtoupper($currentAccess->role->role_name); // Kolom role_name sesuai DBML
+        $roleLevel = $currentAccess->role->role_level;           // Kolom role_level sesuai DBML
+        $userDivisionId = $currentAccess->division_id;
+
+        // Threshold manager (sesuaikan angka levelnya dengan database-mu)
+        $managerLevelThreshold = 3; 
+
+        if ($roleName === 'MANAGER' || $roleLevel >= $managerLevelThreshold) {
+            $showStaffFilter = true;
+
+            // Ambil user lain yang berada di divisi yang sama (berdasarkan user_accesses)
+            // dan memiliki level role yang lebih rendah (< role_level milik manager)
+            $staffUsers = User::where('id', '!=', $authUserId)
+                ->whereHas('userAccesses', function($q) use ($activeOrgId, $userDivisionId, $roleLevel) {
+                    $q->where('organization_id', $activeOrgId)
+                      ->where('division_id', $userDivisionId)
+                      ->whereHas('role', function($subQ) use ($roleLevel) {
+                          $subQ->where('role_level', '<', $roleLevel);
+                      });
+                })
+                ->orderBy('name')
+                ->get();
+        }
+    }
+
+    // 2. Query utama berbasis dokumen
+    $query = Documents::query()
+        ->where('organization_id', $activeOrgId)
+        ->with(['requester', 'organization', 'folder']);
+
+    // LOGIC FILTER BERDASARKAN ROLE & INPUT STAFF
+    if ($showStaffFilter && $request->filled('staff_user_id')) {
+        // Jika manager memilih staff tertentu, breakdown data milik staff tersebut
+        $query->whereHas('documentApprovals', function($q) use ($request) {
+            $q->where('approver_id', $request->staff_user_id);
+        });
+    } else {
+        // Default / Jika bukan manager: Hanya dokumen yang melibatkan dirinya sendiri
+        $query->whereHas('documentApprovals', function($q) use ($authUserId) {
+            $q->where('approver_id', $authUserId);
+        })
+        ->where('requester_id', '!=', $authUserId);
+    }
+
+    // --- Sisa filter query dan summary ke bawah tetap sama seperti sebelumnya ---
+    if ($request->filled('division_id')) {
+        $query->where('requester_division_id', $request->division_id);
+    }
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('from_date')) {
+        $query->whereDate('created_at', '>=', $request->from_date);
+    }
+    if ($request->filled('to_date')) {
+        $query->whereDate('created_at', '<=', $request->to_date);
+    }
+
+    $documentIds = (clone $query)->pluck('id');
+    $approvalBaseQuery = DocumentApproval::whereIn('document_id', $documentIds);
+
+    $targetApproverId = ($showStaffFilter && $request->filled('staff_user_id')) 
+        ? $request->staff_user_id 
+        : $authUserId;
+
+    $baseQuery = clone $query;
+    $summary = [
+        'total'    => $baseQuery->count(),
+        'pending'  => (clone $approvalBaseQuery)->where('approver_id', $targetApproverId)->where('status', 'Pending')->count(),
+        'approved' => (clone $approvalBaseQuery)->where('approver_id', $targetApproverId)->where('status', 'Approved')->count(),
+        'rejected' => (clone $approvalBaseQuery)->where('approver_id', $targetApproverId)->where('status', 'Rejected')->count(),
+        'overdue'  => (clone $approvalBaseQuery)->where('is_overdue', true)->count(),
+    ];
+
+    $summary['approved_today'] = (clone $approvalBaseQuery)
+        ->where('approver_id', $targetApproverId)
+        ->where('status', 'Approved')
+        ->whereDate('updated_at', Carbon::today())
+        ->count();
+
+    $avgTime = (clone $approvalBaseQuery)
+        ->where('status', 'Approved')
+        ->whereNotNull('started_at')
+        ->selectRaw("AVG(EXTRACT(DAY FROM (updated_at - started_at))) as avg_days")
+        ->value('avg_days');
+
+    $summary['avg_time'] = round($avgTime);
+    $summary['compliance'] = $summary['approved'] == 0 
+        ? 0 
+        : round((($summary['approved'] - $summary['overdue']) / $summary['approved']) * 100, 2);
+
+    $statusBreakdown = [
+        'butuh_approval' => $summary['pending'],
+        'approved'       => $summary['approved'],
+        'rejected'       => $summary['rejected'],
+        'overdue'        => $summary['overdue'],
+    ];
+
+    $pendingDocs = (clone $query)
+        ->where('status', 'Pending')
+        ->with(['documentApprovals' => fn($q) => $q->where('status', 'Pending')])
+        ->orderByRaw("(SELECT COUNT(*) FROM document_approvals WHERE document_approvals.document_id = documents.id AND is_overdue = true) DESC")
+        ->orderBy('created_at', 'asc')
+        ->limit(10)
+        ->get()
+        ->map(function($doc) {
+            $started = Carbon::parse($doc->created_at);
+            $doc->aging = $started->diffInDays(Carbon::now());
+            
+            $hasOverdueApproval = $doc->documentApprovals->where('is_overdue', true)->isNotEmpty();
+            if ($hasOverdueApproval) {
+                $doc->priority = 'CRITICAL';
+                $doc->priority_class = 'danger';
+            } elseif ($doc->aging >= 3) {
+                $doc->priority = 'HIGH';
+                $doc->priority_class = 'warning';
+            } else {
+                $doc->priority = 'NORMAL';
+                $doc->priority_class = 'primary';
+            }
+            return $doc;
+        });
+
+    $approverWorkload = DocumentApproval::query()
+        ->where('status', 'Pending')
+        ->whereIn('document_id', $documentIds)
+        ->select('approver_id')
+        ->selectRaw('COUNT(*) as total_pending')
+        ->selectRaw('SUM(CASE WHEN is_overdue = true THEN 1 ELSE 0 END) as overdue_count')
+        ->groupBy('approver_id')
+        ->with('approver')
+        ->orderByDesc('total_pending')
+        ->limit(8)
+        ->get();
+
+    $approverLabels = $approverWorkload->map(fn($w) => $w->approver->name ?? 'Unknown')->toArray();
+    $approverData = $approverWorkload->map(fn($w) => $w->total_pending)->toArray();
+
+    $urgentAlerts = (clone $query)
+        ->where('status', 'Pending')
+        ->whereHas('documentApprovals', function($q) {
+            $q->where('status', 'Pending')
+            ->where(function($sub) {
+                $sub->where('is_overdue', true)
+                    ->orWhereRaw('EXTRACT(DAY FROM (CURRENT_DATE - started_at)) >= 5');
+            });
+        })
+        ->with(['documentApprovals' => fn($q) => $q->where('status', 'Pending')->with('approver')])
+        ->orderBy('created_at')
+        ->limit(5)
+        ->get();
+
+    $recentActivities = Documents::with(['requester'])
+        ->latest('updated_at')
+        ->limit(8)
+        ->get();
+
+    $trendLabels = [];
+    $trendData = [];
+    $slaData = [];
+
+    for ($i = 6; $i >= 0; $i--) {
+        $date = Carbon::today()->subDays($i);
+        $trendLabels[] = $date->format('d M');
+        
+        // 1. Menghitung tren dokumen yang di-approve per hari
+        $trendData[] = DocumentApproval::where('status', 'Approved')
+            ->whereIn('document_id', $documentIds)
+            ->where('approver_id', $targetApproverId)
+            ->whereDate('updated_at', $date)
+            ->count();
+            
+        // 2. HITUNG SLA COMPLIANCE ASLI PER HARI
+        // Ambil total approval selesai di tanggal tersebut
+        $approvedOnDay = DocumentApproval::where('status', 'Approved')
+            ->whereIn('document_id', $documentIds)
+            ->where('approver_id', $targetApproverId)
+            ->whereDate('updated_at', $date)
+            ->count();
+
+        // Ambil yang overdue di tanggal tersebut
+        $overdueOnDay = DocumentApproval::where('status', 'Approved')
+            ->whereIn('document_id', $documentIds)
+            ->where('approver_id', $targetApproverId)
+            ->where('is_overdue', true)
+            ->whereDate('updated_at', $date)
+            ->count();
+
+        // Rumus hitung persentase kepatuhan SLA harian
+        $slaData[] = $approvedOnDay == 0 
+            ? 0 
+            : round((($approvedOnDay - $overdueOnDay) / $approvedOnDay) * 100, 2);
+    }
+
+    return view('dashboard.sla', [
+        'summary'          => $summary,
+        'statusBreakdown'  => $statusBreakdown,
+        'pendingDocs'      => $pendingDocs,
+        'approverWorkload' => $approverWorkload,
+        'urgentAlerts'     => $urgentAlerts,
+        'recentActivities' => $recentActivities,
+        
+        'trendLabels'      => $trendLabels,
+        'trendData'        => $trendData,
+        'slaLabels'        => $trendLabels, 
+        'slaData'          => $slaData,
+        'approverLabels'   => $approverLabels,
+        'approverData'     => $approverData,
+
+        // Data filter untuk Blade View
+        'showStaffFilter'  => $showStaffFilter,
+        'staffUsers'       => $staffUsers,
+
+        'organizations'    => Organization::orderBy('organization_name')->get(),
+        'divisions'        => Division::orderBy('division_name')->get(),
+        'approvers'        => User::orderBy('name')->get(),
+    ]);
+}
+}

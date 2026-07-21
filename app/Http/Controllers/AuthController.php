@@ -28,8 +28,19 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
-        if ($user->systemRole->id === 1) {
+        // 1. GUARD: Cek apakah user statusnya inactive
+        if (!$user->is_active) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
+            return back()->withErrors([
+                'username' => 'Your account is inactive. Please contact the administrator.'
+            ]);
+        }
+
+        // 2. Logic untuk Superadmin (System Role ID 1)
+        if ($user->systemRole?->id === 1) {
             session([
                 'is_superadmin' => true
             ]);
@@ -37,6 +48,7 @@ class AuthController extends Controller
             return redirect('/dashboard');
         }
 
+        // 3. Logic untuk Regular User
         $userAccesses = $user->userAccesses;
 
         if ($userAccesses->isEmpty()) {
@@ -56,12 +68,12 @@ class AuthController extends Controller
             'active_role_id' => $access->role_id,
         ]);
 
-        return redirect('/dashboard');
+        return redirect('/dashboard/sla');
     }
+
     public function switchContext(Request $request)
     {
-  
-          $access = UserAccess::where('id', $request->access_id)
+        $access = UserAccess::where('id', $request->access_id)
             ->where('user_id', auth()->id())
             ->firstOrFail();
 
@@ -71,7 +83,6 @@ class AuthController extends Controller
             'active_division_id' => $access->division_id,
             'active_role_id' => $access->role_id,
         ]);
-        
 
         return response()->json([
             'message' => 'Context switched'

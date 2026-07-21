@@ -76,6 +76,15 @@ class OrganizationService
 
     public function deleteOrganization(Organization $organization)
     {
+        if (
+            $organization->useraccess()->exists() ||
+            $organization->workflow()->exists() ||
+            $organization->folder()->exists() ||
+            $organization->document()->exists()
+        ) {
+            throw new \Exception('Organization cannot be deleted because it is already used.');
+        }
+
         $oldData = [
             'organization_name' => $organization->organization_name,
         ];

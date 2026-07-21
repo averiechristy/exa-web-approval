@@ -454,7 +454,7 @@ class UploadController extends Controller
     /**
      * Auto apply requester signature to PDF if "Show on document" is checked
      */
-   private function applyRequesterSignature($document, $payload, $fileIndex, $approvalIdsMap)
+ private function applyRequesterSignature($document, $payload, $fileIndex, $approvalIdsMap)
 {
     $requesterApproval = collect($payload['document_approvals'])
         ->firstWhere('is_requester', true);
@@ -464,7 +464,7 @@ class UploadController extends Controller
     }
 
     $placementType = $payload['placement_type'] ?? 'custom';
-    $isFixedMode = $placementType === 'fixed';
+    $isFixedMode = ($placementType === 'fixed');
 
     $originalPath = storage_path('app/public/' . $document->path);
     $newFilename = time() . ($isFixedMode ? '_summary_' : '_req_') . basename($document->path);
@@ -481,17 +481,53 @@ class UploadController extends Controller
         $approver = User::find($requesterApproval['approver_id']);
         $approvalTime = now()->format('d M Y H:i');
 
-        // ==================== HALAMAN ASLI ====================
+        $approvalStartY = null;
+
+        // ==================== 1. PROSES HALAMAN ASLI DULU ====================
         for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+            // Selalu tambahkan halaman asli ke PDF baru
             $pdf->AddPage();
             $tplId = $pdf->importPage($pageNo);
             $pdf->useTemplate($tplId, 0, 0, null, null, true);
 
-            if ($isFixedMode) continue; // Fixed mode tidak taruh di halaman asli
+            // Jika mode fixed, lewati penulisan teks coretan di halaman asli
+            if ($isFixedMode) {
+                continue; 
+            }
+
+            // --- Logika Custom Mode (Teks menempel di halaman asli sesuai koordinat) ---
+            $size = $pdf->getTemplateSize($tplId);
+            $pageWidth = $size['width'];
+            $pageHeight = $size['height'];
+            $paddingY = 2;
+            $textToInsert = "Requested by {$approver->name}";
+
+            $positions = collect($payload['file_positions'][$fileIndex]['signatures'] ?? [])
+                ->where('approver_temp_id', $requesterApproval['temp_id']);
+
+            foreach ($positions as $pos) {
+                if ((int)$pos['page_number'] !== $pageNo) continue;
+
+                $x = $pos['pos_x_percent'] * $pageWidth;
+                $y = ($pos['pos_y_percent'] * $pageHeight) + $paddingY;
+
+                $pdf->SetFont('helvetica', 'B', 11);
+                $pdf->SetTextColor(0, 128, 0);
+                $pdf->SetXY($x, $y);
+                $pdf->SetAutoPageBreak(false);
+                
+                $textWidth = $pdf->GetStringWidth($textToInsert);
+                if (($x + $textWidth) > $pageWidth) {
+                    $x = $pageWidth - $textWidth - 5;
+                }
+
+                $pdf->Text($x, $y, $textToInsert);
+            }
         }
 
-        // ===================== FIXED MODE: SUMMARY PAGE (Awal) =====================
+        // ===================== 2. FIXED MODE: SUMMARY PAGE (Di Halaman Paling Akhir) =====================
         if ($isFixedMode) {
+            // Menambahkan halaman baru SETELAH loop halaman asli selesai
             $pdf->AddPage();
 
             $pdf->SetFont('helvetica', 'B', 18);
@@ -508,31 +544,32 @@ class UploadController extends Controller
             $pdf->Ln(12);
 
             // Requested By
-                // Requested By
-                $pdf->SetFont('helvetica', 'B', 12);
-                $pdf->Cell(0, 10, 'Requested by : ' . $approver->name, 0, 1);
-                $pdf->SetFont('helvetica', '', 11);
-                $pdf->Cell(0, 8, 'Date : ' . $approvalTime, 0, 1);
-                $pdf->Ln(15);
+            $pdf->SetFont('helvetica', 'B', 12);
+            $pdf->Cell(0, 10, 'Requested by : ' . $approver->name, 0, 1);
+            $pdf->SetFont('helvetica', '', 11);
+            $pdf->Cell(0, 8, 'Date : ' . $approvalTime, 0, 1);
+            $pdf->Ln(15);
 
-            // Approved By - Kosong dulu
+            // Approved By - Tempat tanda tangan berikutnya
             $pdf->SetFont('helvetica', 'B', 12);
             $pdf->Cell(0, 10, 'Approved by :', 0, 1);
             $pdf->SetFont('helvetica', '', 11);
 
             $approvalStartY = $pdf->GetY();
-
         }
 
+        // Simpan file baru
         $pdf->Output($newFullPath, 'F');
+        
+        // Update data dokumen di database
         $document->update([
-            'approval_summary_created' => true,
-            'approval_start_y' => $approvalStartY,
+            'approval_summary_created' => $isFixedMode,
+            'approval_start_y'         => $approvalStartY,
+            'path'                     => $newPath
         ]);
-        $document->update(['path' => $newPath]);
 
     } catch (\Exception $e) {
-        \Log::error('Requester Signature Error: ' . $e->getMessage());
+        \Log::error('Requester Signature Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine());
     }
 }
     /**

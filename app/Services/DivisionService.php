@@ -78,6 +78,15 @@ class DivisionService
 
     public function deleteDivision(Division $division)
     {
+
+        if (
+            $division->useraccess()->exists() ||
+            $division->workflowstep()->exists() ||
+            $division->documentapproval()->exists()
+        ) {
+            throw new \Exception('Division cannot be deleted because it is already used.');
+        }
+
         $oldData = [
             'division_name' => $division->division_name,
         ];

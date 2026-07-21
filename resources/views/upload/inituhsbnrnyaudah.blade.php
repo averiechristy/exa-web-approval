@@ -487,7 +487,7 @@ pdfCanvas.addEventListener('drop', function (e) {
 
     const currentFile = uploadedFiles[activeFileIndex];
     if (!currentFile) {
-        console.warn("⚠️ File tidak ditemukan");
+        console.warn("⚠️ File not found");
         return;
     }
 

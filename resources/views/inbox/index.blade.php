@@ -9,118 +9,26 @@
         transform: translateY(-3px);
         box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
     }
-    .current-folder {
-        background-color: #f8f9fc;
-        border-left: 4px solid #4e73df;
-    }
 </style>
 
 @section('content')
 <div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">Inbox</h1>
 
-    <!-- Header + Breadcrumb -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('inbox.index') }}">Inbox</a>
-                    </li>
-                    
-                    @if(isset($folder) && $breadcrumb)
-                        @foreach($breadcrumb as $crumb)
-                            @if($loop->last)
-                                <li class="breadcrumb-item active">{{ $crumb->folder_name }}</li>
-                            @else
-                                <li class="breadcrumb-item">
-                                    <a href="{{ route('inbox.show', $crumb->id) }}">{{ $crumb->folder_name }}</a>
-                                </li>
-                            @endif
-                        @endforeach
-                    @endif
-                </ol>
-            </nav>
-        </div>
-    </div>
-
-<!-- Folders Section -->
-<div class="mb-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="text-muted mb-0">
-            @if(isset($folder))
-                Folders in <strong>"{{ $folder->folder_name }}"</strong>
-            @else
-                Root Folders
-            @endif
-        </h6>
-
-        <!-- Search Folder -->
-        <form method="GET" 
-              action="{{ isset($folder) ? route('inbox.show', $folder) : route('inbox.index') }}" 
-              style="width: 260px;">
-            
-            <div class="input-group input-group-sm">
-                <input 
-                    type="text" 
-                    name="folder_search"
-                    id="folderSearchInput"
-                    class="form-control"
-                    placeholder="Search folders..."
-                    value="{{ request('folder_search') }}">
-                
-                <button class="btn btn-outline-secondary" type="submit">
-                    <i class="fas fa-search"></i>
-                </button>
-                
-                @if(request('folder_search'))
-                    <a href="{{ isset($folder) ? route('inbox.show', $folder) : route('inbox.index') }}" 
-                       class="btn btn-outline-secondary">
-                        <i class="fas fa-times"></i>
-                    </a>
-                @endif
-            </div>
-        </form>
-    </div>
-
-    @if($folders->isNotEmpty())
-     <div class="row">
-    @foreach($folders as $f)
-    <div class="col-6 col-sm-4 col-md-3 col-lg-2 mb-4">
-        <a href="{{ route('inbox.show', $f->id) }}" class="text-decoration-none">
-            <div class="text-center p-3 border rounded-3 hover-shadow bg-white">
-                <i class="fas fa-folder fa-3x text-primary mb-2"></i>
-                <p class="mb-1 fw-medium text-dark">{{ $f->folder_name }}</p>
-            </div>
-        </a>
-    </div>
-    @endforeach
-</div>
-
-        <!-- Pagination -->
-<!-- Pagination Folder -->
-<div class="d-flex justify-content-between align-items-center mt-5 mb-5">
-    <div class="text-muted small">
-        Showing <strong>{{ $folders->firstItem() }}</strong> to 
-        <strong>{{ $folders->lastItem() }}</strong> 
-        of <strong>{{ $folders->total() }}</strong> folders
-    </div>
-    
-    @if($folders->lastPage() > 1)
-        {{ $folders->onEachSide(2)->links('pagination::bootstrap-4', ['pageName' => 'folder_page']) }}
-    @endif
-</div>
-    @else
-        <p class="text-muted">No folders found.</p>
-    @endif
-</div>
     @if(session('success'))
-    <div class="alert alert-success">
-        {{ session('success') }}
-    </div>
-@endif
+        <div class="alert alert-success">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger">
+            {{ session('error') }}
+        </div>
+    @endif
 
     {{-- Documents Section - Hanya tampil jika sedang di dalam folder --}}
-    @if(isset($folder))
+ 
         <!-- Top Bar -->
         <div class="d-flex justify-content-between mb-3">
             <div>
@@ -146,7 +54,7 @@
     <!-- Filter -->
         <div class="card shadow-sm mb-4">
             <div class="card-body">
-                <form method="GET" action="{{ route('inbox.show', $folder) }}">
+                <form method="GET" action="{{ route('inbox.index') }}">
                     <div class="row align-items-end">
                         <div class="col-md-2">
                             <label class="small font-weight-bold">Status</label>
@@ -182,7 +90,7 @@
                                 <button class="btn btn-primary" type="submit" style="margin-right: 10px;">
                                     <i class="fas fa-filter"></i> Apply Filter
                                 </button>
-                                <a href="{{ route('inbox.show', $folder) }}" 
+                                <a href="{{ route('inbox.index') }}" 
                                 class="btn btn-secondary flex-fill">
                                     <i class="fas fa-undo"></i> Reset
                                 </a>
@@ -195,9 +103,6 @@
         
         <!-- Documents -->
         <div class="card shadow mb-4">
-            <div class="card-header bg-white">
-                <h6 class="mb-0">Documents in "{{ $folder->folder_name }}"</h6>
-            </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-bordered">
@@ -206,6 +111,8 @@
                                 <th width="40"><input type="checkbox" id="selectAll"></th>
                                 <th>Document Name</th>
                                 <th>Status</th>
+                                <th>Folder</th>
+                                <th>Created Time</th>
                                 <th>Last Modified</th>
                                 <th>Requester</th>
                                 <th width="180">Action</th>
@@ -229,6 +136,8 @@
                                         {{ $document->status }}
                                     </span>
                                 </td>
+                                <td>{{ $document->folder?->full_path ?? '-' }}</td>
+                                <td>{{ $document->created_at->format('d M Y, H:i') }}</td>
                                 <td>{{ $document->updated_at->format('d M Y, H:i') }}</td>
                                 <td>
                                     {{ $document->requester?->name ?? '-' }} 
@@ -244,9 +153,13 @@
                                         download>
                                             <i class="fas fa-download text-success"></i>
                                         </a>
-                                    <a href="#" class="btn btn-sm btn-light" title="Share">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-light btn-share-document"
+                                        data-document-id="{{ $document->id }}"
+                                        title="Share">
                                         <i class="fas fa-share-alt text-info"></i>
-                                    </a>
+                                    </button>
                                     <button type="button"
                                             class="btn btn-sm btn-light btn-move-folder"
                                             data-document-id="{{ $document->id }}">
@@ -256,7 +169,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
+                                <td colspan="8" class="text-center py-5 text-muted">
                                     <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                     No documents in this folder.
                                 </td>
@@ -311,7 +224,7 @@
             </div>
             </div>
         </div>
-    @endif
+    
 
 </div>
 
@@ -376,6 +289,73 @@
         </form>
     </div>
 </div>
+
+<!-- Share Document Modal -->
+<div class="modal fade" id="shareDocumentModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <form method="POST" action="{{ route('documents.share') }}" id="shareForm">
+            @csrf
+
+            <input type="hidden" name="document_id" id="share_document_id">
+
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Share Document</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="form-group">
+                        <label>Select User</label>
+
+<div id="userContainer">
+    <div class="user-row mb-2 d-flex">
+        <select class="form-control user-select" name="user_ids[]" required>
+            <option value="">Choose User</option>
+            @foreach($userOptions as $user)
+                <option value="{{ $user->id }}">
+                    {{ $user->name }} ({{ $user->username }})
+                </option>
+            @endforeach
+        </select>
+
+        <button type="button"
+                class="btn btn-danger ml-2 btn-remove-user"
+                style="display:none">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+
+<button type="button" class="btn btn-outline-primary mt-2" id="addUserBtn">
+    <i class="fas fa-plus"></i> Add User
+</button>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary">
+                        Share
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
 <script>
 // Bulk Action Script
@@ -425,6 +405,79 @@ $(document).ready(function () {
         $('#moveFolderModal').modal('show');
     });
 
+});
+
+$('#addUserBtn').click(function () {
+
+    let row = $('.user-row:first').clone();
+
+    row.find('select').val('');
+
+    row.find('.btn-remove-user').show();
+
+    $('#userContainer').append(row);
+});
+
+$(document).on('click', '.btn-remove-user', function () {
+    $(this).closest('.user-row').remove();
+});
+
+$('#shareForm').submit(function (e) {
+
+    let users = [];
+    let duplicate = false;
+    let empty = false;
+
+    $('.user-select').each(function () {
+
+        let value = $(this).val();
+
+        if (!value) {
+            empty = true;
+            return false;
+        }
+
+        if (users.includes(value)) {
+            duplicate = true;
+            return false;
+        }
+
+        users.push(value);
+    });
+
+    if (empty) {
+        e.preventDefault();
+
+        Swal.fire({
+            icon: 'warning',
+            title: 'Validation',
+            text: 'Please select all users.'
+        });
+
+        return;
+    }
+
+    if (duplicate) {
+        e.preventDefault();
+
+        Swal.fire({
+            icon: 'warning',
+            title: 'Validation',
+            text: 'Duplicate users are not allowed.'
+        });
+
+        return;
+    }
+});
+
+$('.btn-share-document').on('click', function (e) {
+    e.preventDefault();
+
+    let documentId = $(this).data('document-id');
+
+    $('#share_document_id').val(documentId);
+
+    $('#shareDocumentModal').modal('show');
 });
 
 function toggleButtons() {

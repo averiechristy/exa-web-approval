@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\LogActivityJob;
 use App\Mail\DocumentApprovalMail;
 use App\Models\ApprovalPosition;
 use App\Models\DocumentApproval;
 use App\Models\Documents;
+use App\Models\DocumentShare;
 use App\Models\Folder;
 use App\Models\User;
 use DB;
@@ -97,40 +99,105 @@ class InboxController extends Controller
     public function index()
     {
         $user = auth()->user();
-        $organizationId = session('active_organization_id') ?? $user->current_organization_id ?? 1;
+        $organizationId = session('active_organization_id')
+            ?? $user->current_organization_id
+            ?? 1;
 
-        // Search folder
-        $folderSearch = request('folder_search');
+$documents = Documents::with([
+        'requester',
+        'folder.parent'
+    ])
+    ->where('organization_id', $organizationId)
+    ->where(function ($q) use ($user) {
 
-        // Load root folders dengan pagination + search
-        $foldersQuery = Folder::where('organization_id', $organizationId)
-                            ->whereNull('parent_id')
-                            ->orderBy('folder_name');
+        $q->whereHas('documentapprovals', function ($sub) use ($user) {
+            $sub->where('approver_id', $user->id)
+                ->where('status', 'Approved');
+        })
 
-        if ($folderSearch) {
-            $foldersQuery->whereRaw('LOWER(folder_name) LIKE ?', ['%' . strtolower($folderSearch) . '%']);
+        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
+            $sub->where('approver_id', $user->id)
+                ->where('status', 'Pending')
+                ->whereColumn('document_approvals.tier', 'documents.current_tier')
+                ->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))
+                        ->from('document_approvals as da2')
+                        ->whereColumn('da2.document_id', 'document_approvals.document_id')
+                        ->whereColumn('da2.tier', 'document_approvals.tier')
+                        ->whereColumn('da2.approver_order', '<', 'document_approvals.approver_order')
+                        ->where('da2.status', 'Pending');
+                });
+        })
+
+        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
+            $sub->where('approver_id', $user->id)
+                ->where('status', 'Rejected')
+                ->whereColumn('document_approvals.tier', 'documents.current_tier');
+        });
+    });
+
+        // ================= FILTER =================
+
+        $status = request('status');
+        $requester_id = request('requester_id');
+        $from_date = request('from_date');
+        $to_date = request('to_date');
+        $search = request('search');
+        $perPage = request('perPage', 10);
+
+        if ($search) {
+            $documents->whereRaw(
+                'LOWER(document_name) LIKE ?',
+                ['%' . strtolower($search) . '%']
+            );
         }
 
-        $folders = $foldersQuery->paginate(10)
-                            ->appends(request()->query());
+        if ($status) {
+            $documents->where('status', $status);
+        }
 
-        // Documents tetap kosong (seperti sebelumnya)
-        $documents = new LengthAwarePaginator(
-            collect(), 0, 15, 1, [
-                'path'  => request()->url(),
-                'query' => request()->query(),
-            ]
-        );
+        if ($requester_id) {
+            $documents->where('requester_id', $requester_id);
+        }
 
-        // Folder Options untuk move document
-        $rootFoldersQuery = Folder::with('children')
+        if ($from_date) {
+            $documents->whereDate('created_at', '>=', $from_date);
+        }
+
+        if ($to_date) {
+            $documents->whereDate('created_at', '<=', $to_date);
+        }
+
+        $documents = $documents
+            ->orderBy('updated_at', 'desc')
+            ->paginate($perPage)
+            ->appends(request()->query());
+
+        // ================= MOVE FOLDER =================
+
+        $rootFolders = Folder::with('children')
             ->whereNull('parent_id')
-            ->where('organization_id', $organizationId);
-        $rootFolders = $rootFoldersQuery->get();
+            ->where('organization_id', $organizationId)
+            ->get();
+
         $folderOptions = $this->buildFolderOptions($rootFolders);
 
-        return view('inbox.index', compact('folders', 'documents', 'folderOptions'));
+        // ================= REQUESTER FILTER =================
+
+        $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId) {
+                $q->where('organization_id', $organizationId);
+            })
+            ->orderBy('name')
+            ->get();
+
+        return view('inbox.index', compact(
+            'documents',
+            'folderOptions',
+            'userOptions'
+        ));
     }
+
+
 
     private function buildFolderOptions($folders, $prefix = '')
     {
@@ -156,120 +223,6 @@ class InboxController extends Controller
         return $result;
     }
 
-    public function showFolder(Folder $folder)
-    {
-        $user = auth()->user();
-        $organizationId = session('active_organization_id') ?? $user->current_organization_id ?? 1;
-
-        if ($folder->organization_id !== $organizationId) {
-            return redirect()->route('inbox.index');
-        }
-
-        // === FOLDERS dengan Pagination + Search ===
-        $folderSearch = request('folder_search');
-
-        $foldersQuery = Folder::where('organization_id', $organizationId)
-                            ->where('parent_id', $folder->id)
-                            ->orderBy('folder_name');
-
-        if ($folderSearch) {
-            $foldersQuery->whereRaw('LOWER(folder_name) LIKE ?', ['%' . strtolower($folderSearch) . '%']);
-        }
-
-        $folders = $foldersQuery->paginate(10, ['*'], 'folder_page')   // ← Tambahkan 'folder_page'
-                            ->appends(request()->query());
-
-        // === Documents (kode lama kamu tetap) ===
-      $documents = Documents::with(['requester'])
-    ->where('folder_id', $folder->id)
-    ->where('organization_id', $organizationId)
-    ->where(function ($q) use ($user) {
-
-        // User pernah approve dokumen ini
-        $q->whereHas('documentapprovals', function ($sub) use ($user) {
-            $sub->where('approver_id', $user->id)
-                ->where('status', 'Approved');
-        })
-
-        // User adalah approver aktif saat ini
-        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
-            $sub->where('approver_id', $user->id)
-                ->where('status', 'Pending')
-                ->whereColumn('document_approvals.tier', 'documents.current_tier')
-                ->whereNotExists(function ($q) {
-                    $q->select(DB::raw(1))
-                        ->from('document_approvals as da2')
-                        ->whereColumn('da2.document_id', 'document_approvals.document_id')
-                        ->whereColumn('da2.tier', 'document_approvals.tier')
-                        ->whereColumn('da2.approver_order', '<', 'document_approvals.approver_order')
-                        ->where('da2.status', 'Pending');
-                });
-        })
-
-        // User reject di current tier
-        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
-            $sub->where('approver_id', $user->id)
-                ->where('status', 'Rejected')
-                ->whereColumn('document_approvals.tier', 'documents.current_tier');
-        });
-
-    });
-
-        // === FILTERS ===
-        $status = request('status');
-        $requester_id = request('requester_id');
-        $from_date = request('from_date');
-        $to_date = request('to_date');
-        $search = request('search');
-
-        $perPage = request('perPage', 10);
-
-        // Filter Search by Document Name
-        if ($search) {
-            $documents->whereRaw(
-                'LOWER(document_name) LIKE ?',
-                ['%' . strtolower($search) . '%']
-            );
-        }
-        // Filter Status
-        if ($status) {
-            $documents->where('status', $status);
-        }
-
-        // Filter Requester
-        if ($requester_id) {
-            $documents->where('requester_id', $requester_id);
-        }
-
-        // Filter Tanggal
-        if ($from_date) {
-            $documents->whereDate('created_at', '>=', $from_date);
-        }
-        if ($to_date) {
-            $documents->whereDate('created_at', '<=', $to_date);
-        }
-
-        $documents = $documents
-            ->orderBy('updated_at', 'desc')
-            ->paginate($perPage)
-            ->appends(request()->query());
-
-        // Breadcrumb, Folder Options, User Options
-        $breadcrumb = $this->getFolderBreadcrumb($folder);
-        $rootFoldersQuery = Folder::with('children')
-            ->whereNull('parent_id')
-            ->where('organization_id', $organizationId);
-        $rootFolders = $rootFoldersQuery->get();
-        $folderOptions = $this->buildFolderOptions($rootFolders);
-
-        $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId) {
-            $q->where('organization_id', $organizationId);
-        })
-        ->orderBy('name')
-        ->get();
-
-        return view('inbox.index', compact('folders', 'documents', 'folder', 'breadcrumb', 'folderOptions', 'userOptions'));
-    }
     /**
      * Show document preview
      */
@@ -287,10 +240,16 @@ class InboxController extends Controller
             $folder = Folder::find($document->folder_id);
         }
 
-        $document->update(['flag_open' => true]);
+        // Tandai bahwa approver ini sudah membuka dokumen
+        DocumentApproval::where('document_id', $document->id)
+            ->where('approver_id', auth()->id())
+            ->update([
+                'flag_open' => true
+            ]);
 
         return view('inbox.preview', compact('document', 'folder'));
     }
+
     /**
      * Approve document by current approver
      */
@@ -307,7 +266,7 @@ class InboxController extends Controller
 
         $approver = auth()->user();
         $approvalTime = now()->format('d M Y H:i');
-        $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
+        $textToInsert = "Approved by {$approver->name}";
 
         // Ambil approval record
         $documentApproval = DocumentApproval::where('document_id', $id)
@@ -464,6 +423,28 @@ $pdf->Text($x, $y, $textToInsert);
 
             // ==================== REKOMENDASI: KIRIM EMAIL KE TIER BERIKUTNYA ====================
             $this->notifyNextApprover($document);
+              LogActivityJob::dispatchSync(
+                logName: 'document',
+                causedBy: auth()->user(),
+                performedOn: $document->fresh(),
+                event: 'document.approved',
+                description: 'Approve Document',
+                properties: [
+                    'attributes' => [
+                        'document_name' => $document->document_name,
+                        'status' => $document->fresh()->status,
+                        'current_tier' => $document->fresh()->current_tier,
+                    ],
+                    'changes' => [
+                        'approved_by' => auth()->user()->name,
+                        'approval_status' => 'Approved',
+                        'approval_time' => now()->toDateTimeString(),
+                        'approval_order' => $documentApproval->approver_order,
+                        'tier' => $documentApproval->tier,
+                    ],
+                ],
+            );
+
 
             // === RESPONSE ===
             if ($documentStatus === 'Approved') {
@@ -486,6 +467,7 @@ $pdf->Text($x, $y, $textToInsert);
                     'status'  => $documentStatus
                 ]);
             }
+            
 
         } catch (\Exception $e) {
             \Log::error('PDF Approval Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine());
@@ -515,12 +497,17 @@ $pdf->Text($x, $y, $textToInsert);
         
         foreach ($documentIds as $id) {
             $document = Documents::find($id);
+
             if (!$document) {
                 $invalidDocuments[] = "Document ID {$id} not found.";
                 continue;
             }
-            
-            if (!$document->flag_open) {
+
+            $documentApproval = DocumentApproval::where('document_id', $id)
+                ->where('approver_id', $approver->id)
+                ->first();
+
+            if (!$documentApproval || !$documentApproval->flag_open) {
                 $invalidDocuments[] = $document->document_name;
             }
         }
@@ -558,7 +545,7 @@ $pdf->Text($x, $y, $textToInsert);
                     continue;
                 }
 
-                $approvalResult = $this->processSingleApproval($document, $documentApproval, $approver);
+                $approvalResult = $this->processSingleApproval($document, $documentApproval, $approver, $id);
 
                 if ($approvalResult['success']) {
                     $results['success'][] = [
@@ -586,11 +573,18 @@ $pdf->Text($x, $y, $textToInsert);
             'results' => $results
         ]);
     }
-    private function processSingleApproval($document, $documentApproval, $approver)
+    private function processSingleApproval($document, $documentApproval, $approver, $id)
     {
         $approvalTime = now()->format('d M Y H:i');
-        $textToInsert = "Approved by {$approver->name} at {$approvalTime}";
+        $textToInsert = "Approved by {$approver->name}";
 
+        $documentApproval = DocumentApproval::where('document_id', $id)
+            ->where('approver_id', $approver->id)
+            ->first();
+        
+        $approvalPosition = ApprovalPosition::where('document_approval_id', $documentApproval['id'])->first();
+        $placementType = $approvalPosition['mode'] ?? 'custom';
+        $isFixedMode = $placementType === 'fixed';
         $showOnDoc = $documentApproval->show_on_doc ?? true;
         $positions = ApprovalPosition::where('document_approval_id', $documentApproval->id)->get();
 
@@ -599,6 +593,10 @@ $pdf->Text($x, $y, $textToInsert);
         $newPath = 'documents/approved/' . $newFilename;
         $newFullPath = storage_path('app/public/' . $newPath);
 
+        $needCreateSummaryPage =
+            $isFixedMode &&
+            $showOnDoc &&
+            !$document->approval_summary_created;
         Storage::disk('public')->makeDirectory('documents/approved', 0755, true);
 
         try {
@@ -606,6 +604,7 @@ $pdf->Text($x, $y, $textToInsert);
             $pdf->setFontSubsetting(true);
             $pageCount = $pdf->setSourceFile($originalPath);
 
+            $pdf->document_id = $document->id;
             for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
                 $pdf->AddPage();
                 $tplId = $pdf->importPage($pageNo);
@@ -613,20 +612,42 @@ $pdf->Text($x, $y, $textToInsert);
 
                 if (!$showOnDoc) continue;
 
-                $size = $pdf->getTemplateSize($tplId);
-                $pageWidth = $size['width'];
-                $pageHeight = $size['height'];
+                  if (!$isFixedMode && $showOnDoc) {
+                    $size = $pdf->getTemplateSize($tplId);
+                    $pageWidth = $size['width'];
+                    $pageHeight = $size['height'];
 
-                foreach ($positions as $pos) {
-                    if ((int)$pos->page_number !== $pageNo) continue;
+                    foreach ($positions as $pos) {
+                        if ((int)$pos->page_number !== $pageNo) continue;
 
-                    $x = $pos->pos_x_percent * $pageWidth;
-                    $y = $pos->pos_y_percent * $pageHeight;
+                        $x = $pos->pos_x_percent * $pageWidth;
+                        $y = $pos->pos_y_percent * $pageHeight;
 
-                    $pdf->SetFont('helvetica', 'B', 11);
-                    $pdf->SetTextColor(0, 128, 0);
-                    $pdf->SetXY($x, $y);
-                    $pdf->Write(0, $textToInsert);
+                        $pdf->SetFont('helvetica', 'B', 11);
+                        $pdf->SetTextColor(0, 128, 0);
+                        $pdf->SetXY($x, $y);
+                        $pdf->Write(0, $textToInsert);
+                    }
+                }
+                if ($isFixedMode && $showOnDoc && $pageNo === $pageCount) {
+
+                   if ($needCreateSummaryPage) {
+
+                        $this->createApprovalSummaryPage(
+                            $pdf,
+                            $document,
+                            $pageCount
+                        );
+
+                        $document->approval_summary_created = true;
+                    }
+                        $this->addApproverToFixedSummary(
+                        $pdf,
+                        $approver,
+                        $approvalTime,
+                        $document
+                    );
+                    
                 }
             }
 
@@ -668,6 +689,28 @@ $pdf->Text($x, $y, $textToInsert);
             ]);
 
             $this->notifyNextApprover($document); // jika method ini ada
+
+            LogActivityJob::dispatchSync(
+                logName: 'document',
+                causedBy: auth()->user(),
+                performedOn: $document->fresh(),
+                event: 'document.approved',
+                description: 'Approve Document',
+                properties: [
+                    'attributes' => [
+                        'document_name' => $document->document_name,
+                        'status' => $document->fresh()->status,
+                        'current_tier' => $document->fresh()->current_tier,
+                    ],
+                    'changes' => [
+                        'approved_by' => auth()->user()->name,
+                        'approval_status' => 'Approved',
+                        'approval_time' => now()->toDateTimeString(),
+                        'approval_order' => $documentApproval->approver_order,
+                        'tier' => $documentApproval->tier,
+                    ],
+                ],
+            );
 
             return [
                 'success' => true,
@@ -757,6 +800,28 @@ $pdf->Text($x, $y, $textToInsert);
                 'rejected_at' => $now,
             ]);
 
+            LogActivityJob::dispatchSync(
+                logName: 'document',
+                causedBy: auth()->user(),
+                performedOn: $document->fresh(),
+                event: 'document.rejected',
+                description: 'Reject Document',
+                properties: [
+                    'attributes' => [
+                        'document_name' => $document->document_name,
+                        'status' => $document->fresh()->status,
+                        'current_tier' => $document->current_tier,
+                    ],
+                    'changes' => [
+                        'rejected_by' => auth()->user()->name,
+                        'rejection_reason' => $reason,
+                        'rejected_at' => $now->toDateTimeString(),
+                        'approval_order' => $documentApproval->approver_order,
+                        'tier' => $documentApproval->tier,
+                    ],
+                ],
+            );
+
             return response()->json([
                 'success' => true,
                 'message' => 'Document has been rejected.',
@@ -778,7 +843,7 @@ $pdf->Text($x, $y, $textToInsert);
 
         // Cek apakah file ada
         if (!$document->path || !Storage::disk('public')->exists($document->path)) {
-            abort(404, 'File tidak ditemukan');
+            abort(404, 'File not found');
         }
 
         $filePath = $document->path;
@@ -825,19 +890,6 @@ $pdf->Text($x, $y, $textToInsert);
         }
     }
 
-    private function getFolderBreadcrumb(Folder $folder)
-    {
-        $breadcrumb = [];
-        $current = $folder;
-
-        while ($current) {
-            $breadcrumb[] = $current;
-            $current = $current->parent;   // Pastikan relasi parent ada di model Folder
-        }
-
-        return array_reverse($breadcrumb); // dari root ke current
-    }
-
     /**
  * Tambahkan approver baru ke bagian bawah "Approved by" di Summary Page
  */
@@ -845,59 +897,95 @@ $pdf->Text($x, $y, $textToInsert);
  * Tambahkan approver baru ke Summary Page dengan posisi dinamis
  * Tanpa bergantung pada kolom is_requester
  */
-private function addApproverToFixedSummary(Fpdi $pdf, $approver, $approvalTime, $document)
-{
-    // Pindah ke halaman terakhir (Summary Page)
-    $pdf->setPage($pdf->getNumPages());
+    private function addApproverToFixedSummary(Fpdi $pdf, $approver, $approvalTime, $document)
+    {
+        // Pindah ke halaman terakhir (Summary Page)
+        $pdf->setPage($pdf->getNumPages());
 
-    // Hitung jumlah approver yang SUDAH APPROVED (kecuali requester)
-    $approvedCount = DocumentApproval::where('document_id', $document->id)  // pakai $document dari scope luar
-        ->where('status', 'Approved')
-        ->count();
+        // Hitung jumlah approver yang SUDAH APPROVED (kecuali requester)
+        $approvedCount = DocumentApproval::where('document_id', $document->id)  // pakai $document dari scope luar
+            ->where('status', 'Approved')
+            ->count();
 
-    // Karena requester biasanya sudah approved duluan, kurangi 1
-    $approvedCount = max(0, $approvedCount - 1);
+        // Karena requester biasanya sudah approved duluan, kurangi 1
+        $approvedCount = max(0, $approvedCount - 1);
 
-    // Posisi dasar (sesuaikan dengan layout kamu)
-    $baseX = 10;           // mm dari kiri
-    $baseY = $document->approval_start_y;
-    $lineHeight = 6;       // jarak antar baris
+        // Posisi dasar (sesuaikan dengan layout kamu)
+        $baseX = 10;           // mm dari kiri
+        $baseY = $document->approval_start_y;
+        $lineHeight = 6;       // jarak antar baris
 
-    $y = $baseY + ($approvedCount * $lineHeight);
+        $y = $baseY + ($approvedCount * $lineHeight);
 
-    $text = "{$approver->name} at {$approvalTime}";
+        $text = "{$approver->name} at {$approvalTime}";
 
-    $pdf->SetFont('helvetica', 'B', 11);
-    $pdf->SetTextColor(0, 0, 0);
-    $pdf->SetXY($baseX, $y);
-    $pdf->Cell(0, 8, $text, 0, 1);
-}
-
-private function createApprovalSummaryPage(Fpdi $pdf, Documents $document, int $pageCount)
-{
-    $pdf->AddPage();
-
-    $pdf->SetFont('helvetica', 'B', 18);
-    $pdf->Cell(0, 20, 'APPROVAL SUMMARY', 0, 1, 'C');
-    $pdf->Ln(10);
-
-    $pdf->SetFont('helvetica', 'B', 12);
-    $pdf->Cell(0, 10, 'Document Information', 0, 1);
-
-    $pdf->SetFont('helvetica', '', 11);
-    $pdf->Cell(0, 8, 'File Name : ' . $document->document_name, 0, 1);
-    $pdf->Cell(0, 8, 'Total Pages : ' . $pageCount . ' page(s)', 0, 1);
-
-    // kalau requester ada
-    if ($document->requester) {
-        $pdf->Cell(0, 8, 'Requester : ' . $document->requester->name, 0, 1);
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetXY($baseX, $y);
+        $pdf->Cell(0, 8, $text, 0, 1);
     }
 
-    $pdf->Ln(5);
+    private function createApprovalSummaryPage(Fpdi $pdf, Documents $document, int $pageCount)
+    {
+        $pdf->AddPage();
 
-    $pdf->SetFont('helvetica', 'B', 12);
-    $pdf->Cell(0, 10, 'Approved by :', 0, 1);
-    $document->approval_start_y = $pdf->GetY();
+        $pdf->SetFont('helvetica', 'B', 18);
+        $pdf->Cell(0, 20, 'APPROVAL SUMMARY', 0, 1, 'C');
+        $pdf->Ln(10);
+
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Cell(0, 10, 'Document Information', 0, 1);
+
+        $pdf->SetFont('helvetica', '', 11);
+        $pdf->Cell(0, 8, 'File Name : ' . $document->document_name, 0, 1);
+        $pdf->Cell(0, 8, 'Total Pages : ' . $pageCount . ' page(s)', 0, 1);
+
+        // kalau requester ada
+        // if ($document->requester) {
+        //     $pdf->Cell(0, 8, 'Requester : ' . $document->requester->name, 0, 1);
+        // }
+
+        $pdf->Ln(5);
+
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Cell(0, 10, 'Approved by :', 0, 1);
+        $document->approval_start_y = $pdf->GetY();
+    }
+
+    public function share(Request $request)
+{
+    $request->validate([
+        'document_id' => 'required|exists:documents,id',
+        'user_ids' => 'required|array|min:1',
+        'user_ids.*' => 'required|exists:users,id',
+    ]);
+
+    if (count($request->user_ids) !== count(array_unique($request->user_ids))) {
+        return back()
+            ->with('error',  'Duplicate users are not allowed.')
+            ->withInput();
+    }
+
+    foreach (array_unique($request->user_ids) as $userId) {
+
+      $exists = DocumentShare::where('document_id', $request->document_id)
+            ->where('share_to', $userId)
+            ->exists();
+
+        if ($exists) {
+            return back()
+            ->with('error', 'Some selected users have already been shared this document.')
+            ->withInput();
+        }
+
+        DocumentShare::create([
+            'document_id' => $request->document_id,
+            'share_to' => $userId,
+            'share_by' => auth()->id(),
+        ]);
+    }
+
+    return back()->with('success', 'Document shared successfully.');
 }
     public function create()
     {

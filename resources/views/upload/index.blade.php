@@ -548,11 +548,6 @@ function renderSignerListFromStep2() {
             ${parseInt(draggedSigner.id) === parseInt(requester.user_id) ? 'Requested by' : 'Approved by'}
         </span>
                 <span class="approver-name">${draggedSigner.name}</span>
-                <span class="at">at</span>
-                <span class="datetime">${new Date().toLocaleString('id-ID', { 
-                    day: '2-digit', month: 'short', year: 'numeric', 
-                    hour: '2-digit', minute: '2-digit' 
-                }).replace(',', '')}</span>
             </div>
         `;
 
@@ -764,88 +759,96 @@ function renderSignerListFromStep2() {
 
                 // 🔥🔥 NEW: VALIDATION - EVERY APPROVER MUST BE ON EVERY FILE 🔥🔥
                 if (hasShowOnDoc) {
-                    // Get all show_on_document approvers from Step 2
-                    const showOnDocApprovers = [];
-                    step1Data.approvers_data.approvers.forEach(tierData => {
-                        tierData.approvers.forEach(approver => {
-                            if (approver.show_on_document) {
-                                showOnDocApprovers.push({
-                                    user_id: approver.user_id,
-                                    name: approver.name,
-                                    tier: tierData.tier
-                                });
-                            }
-                        });
+        // === COLLECT ALL SHOW ON DOCUMENT USERS (Requester + Approvers) ===
+        const showOnDocUsers = [];
+
+        // 1. Requester
+        const requesterRow = $('.requester-row');
+        if (requesterRow.length > 0) {
+            const requesterShowOnDoc = requesterRow.find('.show-on-doc').is(':checked');
+            if (requesterShowOnDoc) {
+                showOnDocUsers.push({
+                    user_id: requester.user_id,
+                    name: requester.name + " (You)",
+                    tier: 0
+                });
+            }
+        }
+
+        // 2. All Approvers
+        step1Data.approvers_data.approvers.forEach(tierData => {
+            tierData.approvers.forEach(approver => {
+                if (approver.show_on_document && !approver.is_requester) {
+                    showOnDocUsers.push({
+                        user_id: approver.user_id,
+                        name: approver.name,
+                        tier: tierData.tier
                     });
-
-                    // Validation per file
-                    let missingSignatures = [];
-                    
-                    uploadedFiles.forEach((file, fileIdx) => {
-                        // Get signers used in this specific file
-                        const fileSignerIds = new Set(file.signatures.map(s => s.signer_id));
-                        
-                        showOnDocApprovers.forEach(approver => {
-                            if (!fileSignerIds.has(approver.user_id)) {
-                                missingSignatures.push({
-                                    file_name: file.name,
-                                    file_index: fileIdx,
-                                    approver_name: approver.name,
-                                    approver_id: approver.user_id,
-                                    tier: approver.tier
-                                });
-                            }
-                        });
-                    });
-
-                    // If there are missing signatures, show error
-                    if (missingSignatures.length > 0) {
-                        // Group by file for cleaner display
-                        const groupedByFile = {};
-                        missingSignatures.forEach(m => {
-                            if (!groupedByFile[m.file_name]) {
-                                groupedByFile[m.file_name] = [];
-                            }
-                            groupedByFile[m.file_name].push(`${m.approver_name} (Tier ${m.tier})`);
-                        });
-
-                        let errorHtml = `
-                            <div class="text-left">
-                                <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
-                                <strong>All approvers must have signatures on ALL files!</strong><br><br>
-                        `;
-
-                        Object.keys(groupedByFile).forEach(fileName => {
-                            errorHtml += `
-                                <div class="mb-2">
-                                    <strong>📄 ${fileName}</strong><br>
-                                    <span class="text-danger">Missing:</span> 
-                                    ${groupedByFile[fileName].join(', ')}
-                                </div>
-                            `;
-                        });
-
-                        errorHtml += `
-                                <div class="mt-3 p-2 bg-light rounded">
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle text-info mr-1"></i>
-                                        Drag approvers from right panel to each PDF file<br>
-                                        Or switch to <strong>Standard</strong> / <strong>Fixed</strong> mode for auto-placement
-                                    </small>
-                                </div>
-                            </div>
-                        `;
-
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Incomplete Signature Placement',
-                            html: errorHtml,
-                            confirmButtonText: 'OK'
-                        });
-                        return;
-                    }
                 }
+            });
+        });
 
+        // Validation per file
+        let missingSignatures = [];
+
+        uploadedFiles.forEach((file, fileIdx) => {
+            const fileSignerIds = new Set(file.signatures.map(s => parseInt(s.signer_id)));
+
+            showOnDocUsers.forEach(user => {
+                if (!fileSignerIds.has(parseInt(user.user_id))) {
+                    missingSignatures.push({
+                        file_name: file.name,
+                        file_index: fileIdx,
+                        approver_name: user.name,
+                        approver_id: user.user_id,
+                        tier: user.tier
+                    });
+                }
+            });
+        });
+
+        if (missingSignatures.length > 0) {
+            // Group by file for better UX
+            const groupedByFile = {};
+            missingSignatures.forEach(m => {
+                if (!groupedByFile[m.file_name]) groupedByFile[m.file_name] = [];
+                groupedByFile[m.file_name].push(`${m.approver_name} (Tier ${m.tier})`);
+            });
+
+            let errorHtml = `
+                <div class="text-left">
+                    <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+                    <strong>All users with "Show on document" must have signatures on ALL files!</strong><br><br>
+            `;
+
+            Object.keys(groupedByFile).forEach(fileName => {
+                errorHtml += `
+                    <div class="mb-2">
+                        <strong>📄 ${fileName}</strong><br>
+                        <span class="text-danger">Missing:</span> 
+                        ${groupedByFile[fileName].join(', ')}
+                    </div>
+                `;
+            });
+
+            errorHtml += `
+                    <div class="mt-3 p-2 bg-light rounded">
+                        <small class="text-muted">
+                            Drag all required signers (including Requester) to each PDF file
+                        </small>
+                    </div>
+                </div>
+            `;
+
+            Swal.fire({
+                icon: 'warning',
+                title: 'Incomplete Signature Placement',
+                html: errorHtml,
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+    }
                 let totalSignatures = 0;
                 signatureData.forEach(file => {
                     totalSignatures += file.signatures.length;
@@ -1557,11 +1560,6 @@ function renderRequesterSection() {
             ${parseInt(sig.signer_id) === parseInt(requester.user_id) ? 'Requested by' : 'Approved by'}
         </span>
             <span class="approver-name">${sig.signer_name}</span>
-            <span class="at">at</span>
-            <span class="datetime">${new Date().toLocaleString('id-ID', { 
-                day: '2-digit', month: 'short', year: 'numeric', 
-                hour: '2-digit', minute: '2-digit' 
-            }).replace(',', '')}</span>
         </div>
     `;
                 positionSignatureBox(box);

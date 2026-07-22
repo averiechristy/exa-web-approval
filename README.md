@@ -7,6 +7,7 @@
 * [Installation](#installation)
 * [Email Configuration](#email-configuration-gmail-smtp)
 * [Usage](#usage)
+* [Deployment](#deployment)
 
 ---
 
@@ -123,3 +124,25 @@ After running the command, open following URL:
 
 ---
 
+---
+
+## Deployment
+
+When deploying this application to a production server, make sure to adjust the `.env` configuration for security and performance:
+
+1. **Environment & Security Configurations:**
+   * Set `APP_ENV=production`
+   * Set `APP_DEBUG=false` *(Crucial: prevents leaking credentials and stack traces on error)*
+   * Set `APP_URL=https://your-domain.com` *(Use your actual production domain with HTTPS)*
+   * Run `php artisan key:generate` on the production server.
+
+2. **Optimize Laravel Application:**
+   After updating the `.env` file on the production server, run the following commands to cache configuration and routes for maximum performance:
+
+   ```bash
+   php artisan config:cache
+   php artisan route:cache
+   php artisan view:cache
+   php artisan event:cache
+
+---

@@ -45,7 +45,7 @@ extension=curl
 ## Installation
 
 1. Clone repository
-   git clone https://github.com/username/exa-web-approval.git
+   git clone https://github.com/averiechristy/exa-web-approval.git
    cd exa-web-approval
 
 2. Install PHP dependencies

@@ -28,7 +28,6 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
-        // 1. GUARD: Cek apakah user statusnya inactive
         if (!$user->is_active) {
             Auth::logout();
             $request->session()->invalidate();
@@ -39,7 +38,6 @@ class AuthController extends Controller
             ]);
         }
 
-        // 2. Logic untuk Superadmin (System Role ID 1)
         if ($user->systemRole?->id === 1) {
             session([
                 'is_superadmin' => true
@@ -48,7 +46,6 @@ class AuthController extends Controller
             return redirect('/dashboard');
         }
 
-        // 3. Logic untuk Regular User
         $userAccesses = $user->userAccesses;
 
         if ($userAccesses->isEmpty()) {

@@ -491,7 +491,7 @@ class UploadController extends Controller
             $pdf->useTemplate($tplId, 0, 0, null, null, true);
 
             // Jika mode fixed, lewati penulisan teks coretan di halaman asli
-            if ($isFixedMode) {
+            if ($isFixedMode === true) {
                 continue; 
             }
 
@@ -526,7 +526,7 @@ class UploadController extends Controller
         }
 
         // ===================== 2. FIXED MODE: SUMMARY PAGE (Di Halaman Paling Akhir) =====================
-        if ($isFixedMode) {
+        if ($isFixedMode === true) {
             // Menambahkan halaman baru SETELAH loop halaman asli selesai
             $pdf->AddPage();
 

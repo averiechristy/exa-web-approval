@@ -246,30 +246,76 @@
             </div>
         </div>
 
-    <!-- Urgent / Overdue Alert -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3 bg-danger text-white">
-            <h6 class="m-0 font-weight-bold">🚨 Urgent / Overdue Document Alert</h6>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                @forelse($urgentAlerts as $alert)
-                    <div class="col-md-4 mb-2">
-                        <div class="border-left-danger p-3 bg-light rounded">
-                            <strong class="text-danger">{{ $alert->document->document_name ?? 'N/A' }}</strong>
-                            <div class="small text-muted">Approver: {{ $alert->approver->name ?? 'Unknown' }}</div>
-                            <div class="small font-weight-bold text-dark">Pending since: {{ \Carbon\Carbon::parse($alert->started_at)->format('d M Y') }}</div>
+        <!-- Urgent / Overdue Alert -->
+<!-- Main Alert Card -->
+<div class="card shadow mb-4" style="overflow: visible;">
+    <div class="card-header py-3 bg-danger text-white">
+        <h6 class="m-0 font-weight-bold">🚨 Urgent / Overdue Document Alert</h6>
+    </div>
+    <div class="card-body" style="overflow: visible;">
+        <div class="row">
+            @forelse($urgentAlerts as $alert)
+                <div class="col-md-4 mb-3">
+                    <a href="{{ route('inbox.preview', $alert->document_id) }}" class="alert-card-link">
+                        {{-- Masing-masing alert sekarang dibungkus tag .card --}}
+                        <div class="card shadow-sm h-100 alert-item-card">
+                            <div class="card-body p-3">
+                                <strong class="text-danger d-block mb-1 document-title">
+                                    {{ $alert->document->document_name ?? 'N/A' }}
+                                </strong>
+                                <div class="small text-muted">
+                                    Approver: {{ $alert->approver->name ?? 'Unknown' }}
+                                </div>
+                                <div class="small font-weight-bold text-dark mt-1">
+                                    Pending since: {{ \Carbon\Carbon::parse($alert->started_at)->format('d M Y') }}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                @empty
-                    <div class="col-12 text-center text-muted">All clear! No overdue document alerts at the moment.</div>
-                @endforelse
-            </div>
+                    </a>
+                </div>
+            @empty
+                <div class="col-12 text-center text-muted py-3">
+                    All clear! No overdue document alerts at the moment.
+                </div>
+            @endforelse
         </div>
     </div>
-
+</div>
 </div>
 @endsection
+@push('style')
+<style>
+    /* Tag link dibikin block biar full area card bisa diklik */
+    .alert-card-link {
+        text-decoration: none !important;
+        display: block;
+        height: 100%;
+    }
+
+    /* Style untuk card individual di dalam alert */
+    .alert-item-card {
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        border-left: 4px solid #e74a3b !important; /* Akses garis merah di kiri */
+        background-color: #f8f9fc;
+        transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease, background-color 0.25s ease !important;
+        position: relative;
+        z-index: 1;
+        cursor: pointer;
+    }
+
+    /* Efek Pop-Out / Nongol saat Card di-hover */
+    .alert-card-link:hover .alert-item-card {
+        transform: translateY(-8px) scale(1.02) !important; /* Terangkat & membesar presisi */
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12) !important; /* Bayangan timbul lembut */
+        background-color: #ffffff !important;
+        z-index: 10;
+    }
+
+    .alert-card-link:hover .document-title {
+        color: #be2617 !important;
+    }
+</style>
+@endpush
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

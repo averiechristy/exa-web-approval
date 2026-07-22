@@ -82,7 +82,6 @@ class InboxController extends Controller
             $filePath = Storage::disk('public')->path($doc->path);
             $fileNameInZip = $doc->document_name;
 
-            // Tambahkan ekstensi jika belum ada
             if (!str_contains($fileNameInZip, '.')) {
                 $ext = pathinfo($filePath, PATHINFO_EXTENSION);
                 $fileNameInZip .= '.' . $ext;
@@ -93,7 +92,6 @@ class InboxController extends Controller
 
         $zip->close();
 
-        // Return file untuk di-download
         return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
     }
     public function index()
@@ -103,38 +101,38 @@ class InboxController extends Controller
             ?? $user->current_organization_id
             ?? 1;
 
-$documents = Documents::with([
-        'requester',
-        'folder.parent'
-    ])
-    ->where('organization_id', $organizationId)
-    ->where(function ($q) use ($user) {
+        $documents = Documents::with([
+                'requester',
+                'folder.parent'
+            ])
+            ->where('organization_id', $organizationId)
+            ->where(function ($q) use ($user) {
 
-        $q->whereHas('documentapprovals', function ($sub) use ($user) {
-            $sub->where('approver_id', $user->id)
-                ->where('status', 'Approved');
-        })
+            $q->whereHas('documentapprovals', function ($sub) use ($user) {
+                $sub->where('approver_id', $user->id)
+                    ->where('status', 'Approved');
+            })
 
-        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
-            $sub->where('approver_id', $user->id)
-                ->where('status', 'Pending')
-                ->whereColumn('document_approvals.tier', 'documents.current_tier')
-                ->whereNotExists(function ($q) {
-                    $q->select(DB::raw(1))
-                        ->from('document_approvals as da2')
-                        ->whereColumn('da2.document_id', 'document_approvals.document_id')
-                        ->whereColumn('da2.tier', 'document_approvals.tier')
-                        ->whereColumn('da2.approver_order', '<', 'document_approvals.approver_order')
-                        ->where('da2.status', 'Pending');
-                });
-        })
+            ->orWhereHas('documentapprovals', function ($sub) use ($user) {
+                $sub->where('approver_id', $user->id)
+                    ->where('status', 'Pending')
+                    ->whereColumn('document_approvals.tier', 'documents.current_tier')
+                    ->whereNotExists(function ($q) {
+                        $q->select(DB::raw(1))
+                            ->from('document_approvals as da2')
+                            ->whereColumn('da2.document_id', 'document_approvals.document_id')
+                            ->whereColumn('da2.tier', 'document_approvals.tier')
+                            ->whereColumn('da2.approver_order', '<', 'document_approvals.approver_order')
+                            ->where('da2.status', 'Pending');
+                    });
+            })
 
-        ->orWhereHas('documentapprovals', function ($sub) use ($user) {
-            $sub->where('approver_id', $user->id)
-                ->where('status', 'Rejected')
-                ->whereColumn('document_approvals.tier', 'documents.current_tier');
+            ->orWhereHas('documentapprovals', function ($sub) use ($user) {
+                $sub->where('approver_id', $user->id)
+                    ->where('status', 'Rejected')
+                    ->whereColumn('document_approvals.tier', 'documents.current_tier');
+            });
         });
-    });
 
         // ================= FILTER =================
 
@@ -196,8 +194,6 @@ $documents = Documents::with([
             'userOptions'
         ));
     }
-
-
 
     private function buildFolderOptions($folders, $prefix = '')
     {
@@ -329,30 +325,30 @@ $documents = Documents::with([
                 if (!$showOnDoc) continue;
 
                 if (!$isFixedMode && $showOnDoc) {
-                $size = $pdf->getTemplateSize($tplId);
-                $pageWidth = $size['width'];
-                $pageHeight = $size['height'];
+                    $size = $pdf->getTemplateSize($tplId);
+                    $pageWidth = $size['width'];
+                    $pageHeight = $size['height'];
 
-                foreach ($positions as $pos) {
-                    if ((int)$pos->page_number !== $pageNo) continue;
+                    foreach ($positions as $pos) {
+                        if ((int)$pos->page_number !== $pageNo) continue;
 
-                $x = $pos->pos_x_percent * $pageWidth;
-    $y = $pos->pos_y_percent * $pageHeight;
+                        $x = $pos->pos_x_percent * $pageWidth;
+                        $y = $pos->pos_y_percent * $pageHeight;
 
-    $pdf->SetFont('helvetica', 'B', 11);
-    $pdf->SetTextColor(0, 128, 0);
+                        $pdf->SetFont('helvetica', 'B', 11);
+                        $pdf->SetTextColor(0, 128, 0);
 
-    $pdf->SetXY($x, $y);
-     $pdf->SetAutoPageBreak(false);
-     $textWidth = $pdf->GetStringWidth($textToInsert);
+                        $pdf->SetXY($x, $y);
+                        $pdf->SetAutoPageBreak(false);
+                        $textWidth = $pdf->GetStringWidth($textToInsert);
 
-if (($x + $textWidth) > $pageWidth) {
-    $x = $pageWidth - $textWidth - 5;
-}
+                        if (($x + $textWidth) > $pageWidth) {
+                            $x = $pageWidth - $textWidth - 5;
+                        }
 
-$pdf->Text($x, $y, $textToInsert);
+                        $pdf->Text($x, $y, $textToInsert);
+                    }
                 }
-            }
 
                 if ($isFixedMode && $showOnDoc && $pageNo === $pageCount) {
 
@@ -890,13 +886,6 @@ $pdf->Text($x, $y, $textToInsert);
         }
     }
 
-    /**
- * Tambahkan approver baru ke bagian bawah "Approved by" di Summary Page
- */
-/**
- * Tambahkan approver baru ke Summary Page dengan posisi dinamis
- * Tanpa bergantung pada kolom is_requester
- */
     private function addApproverToFixedSummary(Fpdi $pdf, $approver, $approvalTime, $document)
     {
         // Pindah ke halaman terakhir (Summary Page)
@@ -953,82 +942,38 @@ $pdf->Text($x, $y, $textToInsert);
     }
 
     public function share(Request $request)
-{
-    $request->validate([
-        'document_id' => 'required|exists:documents,id',
-        'user_ids' => 'required|array|min:1',
-        'user_ids.*' => 'required|exists:users,id',
-    ]);
+    {
+        $request->validate([
+            'document_id' => 'required|exists:documents,id',
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'required|exists:users,id',
+        ]);
 
-    if (count($request->user_ids) !== count(array_unique($request->user_ids))) {
-        return back()
-            ->with('error',  'Duplicate users are not allowed.')
-            ->withInput();
-    }
-
-    foreach (array_unique($request->user_ids) as $userId) {
-
-      $exists = DocumentShare::where('document_id', $request->document_id)
-            ->where('share_to', $userId)
-            ->exists();
-
-        if ($exists) {
+        if (count($request->user_ids) !== count(array_unique($request->user_ids))) {
             return back()
-            ->with('error', 'Some selected users have already been shared this document.')
-            ->withInput();
+                ->with('error',  'Duplicate users are not allowed.')
+                ->withInput();
         }
 
-        DocumentShare::create([
-            'document_id' => $request->document_id,
-            'share_to' => $userId,
-            'share_by' => auth()->id(),
-        ]);
-    }
+        foreach (array_unique($request->user_ids) as $userId) {
 
-    return back()->with('success', 'Document shared successfully.');
-}
-    public function create()
-    {
-        //
-    }
+        $exists = DocumentShare::where('document_id', $request->document_id)
+                ->where('share_to', $userId)
+                ->exists();
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
+            if ($exists) {
+                return back()
+                ->with('error', 'Some selected users have already been shared this document.')
+                ->withInput();
+            }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
+            DocumentShare::create([
+                'document_id' => $request->document_id,
+                'share_to' => $userId,
+                'share_by' => auth()->id(),
+            ]);
+        }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return back()->with('success', 'Document shared successfully.');
     }
 }

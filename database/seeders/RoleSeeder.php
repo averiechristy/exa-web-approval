@@ -15,19 +15,19 @@ class RoleSeeder extends Seeder
         $roles = [
             [
                 'role_level' => 1,
-                'role_name'  => 'staff',
+                'role_name'  => 'Staff',
             ],
             [
                 'role_level' => 2,
-                'role_name'  => 'supervisor',
+                'role_name'  => 'Supervisor',
             ],
             [
                 'role_level' => 3,
-                'role_name'  => 'manager',
+                'role_name'  => 'Manager',
             ],
             [
                 'role_level' => 4,
-                'role_name'  => 'director',
+                'role_name'  => 'Director',
             ],
         ];
 

@@ -13,13 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             SystemRoleSeeder::class,
-            OrganizationSeeder::class,
-            DivisionSeeder::class,
             RoleSeeder::class,
-            UserSeeder::class,
-            WorkflowSeeder::class, // Ditambahkan di sini
-            FolderSeeder::class,
-            DocumentSeeder::class
         ]);
     }
 }

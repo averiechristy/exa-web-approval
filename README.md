@@ -101,7 +101,7 @@ MAIL_PASSWORD="xxxx xxxx xxxx xxxx"
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=email.itsupport@domain.com
 MAIL_FROM_NAME="${APP_NAME}"
-
+```
 ---
 
 ## Usage

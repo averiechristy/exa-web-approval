@@ -43,6 +43,11 @@
     php artisan key:generate
     ```
 
+   Link the storage directory:
+      ```bash
+      php artisan storage:link
+      ```
+
 5. Configure database information
 
     Configure database information .env file.  

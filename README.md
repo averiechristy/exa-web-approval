@@ -77,32 +77,6 @@
 
 ---
 
-### Email Configuration (Gmail SMTP)
-
-This application uses Gmail SMTP for sending emails/notifications. Follow the steps below to configure it:
-
-#### 1. Google Account Setup
-Before adding the credentials to your `.env` file, ensure the sender's Google account is properly configured:
-1. Log in to your google account.
-2. **Enable 2-Step Verification** in the account security settings.
-3. Open the [Google App Passwords](https://myaccount.google.com/apppasswords) page.
-4. Create a new **App Password** (enter the application name, e.g., `EXA WEB APPROVAL`).
-5. **Save/Copy the generated 16-digit password.** *This password will be used in `.env`, not your regular Gmail login password.*
-
-#### 2. Configure the `.env` File
-Open your `.env` file and update the following variables using the IT Support email and the generated **App Password**:
-
-```env
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=email.itsupport@domain.com
-MAIL_PASSWORD="xxxx xxxx xxxx xxxx"
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=email.itsupport@domain.com
-MAIL_FROM_NAME="${APP_NAME}"
-```
----
 
 ## Usage
 

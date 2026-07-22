@@ -68,7 +68,7 @@
 
     There are two steps to complete:
 
-    #### 1. Run Database Seeder
+    #### Run Database Seeder
     This command will execute the `DatabaseSeeder` class to populate the base data:
 
     ```bash

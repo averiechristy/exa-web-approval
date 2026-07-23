@@ -16,7 +16,6 @@
 * Language: PHP
 * Framework: Laravel 13
 * Database: PostgreSQL
-* Testing: Pest
 
 ---
 
@@ -71,8 +70,6 @@
 7. Database Seeding
 
     After running the migrations, you need to seed the database with initial data.
-
-    There are two steps to complete:
 
     #### Run Database Seeder
     This command will execute the `DatabaseSeeder` class to populate the base data:

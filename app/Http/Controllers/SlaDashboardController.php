@@ -294,26 +294,52 @@ class SlaDashboardController extends Controller
             ->get();
 
         // ==================== GRAPH TREND 7 HARI ====================
+        // ==================== GRAPH TREND (DINAMIS 30 HARI / ACCORDING TO FILTER) ====================
         $trendLabels = [];
-        $trendData = [];
-        $slaData = [];
+        $trendData   = [];
+        $slaData     = [];
 
-        for ($i = 6; $i >= 0; $i--) {
-            $date = \Carbon\Carbon::today()->subDays($i);
-            $trendLabels[] = $date->format('d M');
+        // 1. Tentukan Tanggal Mulai (Start) dan Tanggal Selesai (End)
+        // Prioritas: Input User -> Jika Kosong Gunakan Default 30 Hari Terakhir
+        $startDate = $request->filled('from_date') 
+            ? \Carbon\Carbon::parse($request->from_date)->startOfDay() 
+            : \Carbon\Carbon::today()->subDays(29)->startOfDay();
+
+        $endDate = $request->filled('to_date') 
+            ? \Carbon\Carbon::parse($request->to_date)->endOfDay() 
+            : \Carbon\Carbon::today()->endOfDay();
+
+        // Fallback jika user salah memasukkan tanggal (start > end)
+        if ($startDate->gt($endDate)) {
+            $startDate = (clone $endDate)->subDays(29)->startOfDay();
+        }
+
+        // 2. Loop Setiap Hari dari Start Date sampai End Date
+        $currentDate = clone $startDate;
+        while ($currentDate->lte($endDate)) {
+            // Label Format: Misal "23 Jul"
+            $trendLabels[] = $currentDate->format('d M');
             
-            // Filter clone khusus per tanggal perulangan
-            $dayQuery = (clone $baseQuery)->whereDate('completed_at', $date);
+            // Filter Query khusus untuk tanggal pada iterasi saat ini
+            $dayQuery = (clone $baseQuery)->whereDate('completed_at', $currentDate->format('Y-m-d'));
 
             $approvedOnDay = (clone $dayQuery)->where('status', 'Approved')->count();
-            $overdueOnDay  = (clone $dayQuery)->where('status', 'Approved')->where('is_overdue', true)->count();
+            
+            // Menghitung SLA Compliance harian
+            $overdueOnDay  = (clone $dayQuery)->where('status', 'Approved')
+                ->where(function($q) {
+                    $q->whereNotNull('due_at')
+                    ->whereColumn('completed_at', '>', 'due_at');
+                })->count();
 
             $trendData[] = $approvedOnDay;
             $slaData[]   = $approvedOnDay == 0 
                 ? 0 
                 : round((($approvedOnDay - $overdueOnDay) / $approvedOnDay) * 100, 2);
-        }
 
+            // Increment 1 hari
+            $currentDate->addDay();
+        }
         return view('dashboard.sla', [
             'summary'          => $summary,
             // 'statusBreakdown'  => $statusBreakdown,

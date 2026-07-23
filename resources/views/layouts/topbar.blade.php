@@ -85,7 +85,10 @@
             </a>
 
             <div class="dropdown-menu dropdown-menu-right shadow">
-                <a class="dropdown-item" href="#">Change Password</a>
+                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#changePasswordModal">
+                        <i class="fas fa-key fa-sm fa-fw mr-2 text-gray-400"></i>
+                        Change Password
+                    </a>
                 
                 <div class="dropdown-divider"></div>
 
@@ -99,8 +102,140 @@
     </ul>
 </nav>
 
+{{-- 🔔 ALERT SUCCESS / ERROR --}}
+@if (session('success'))
+    <div class="alert alert-success alert-dismissible fade show mx-4 mt-2" role="alert">
+        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
+
+@if ($errors->has('current_password') || $errors->has('new_password'))
+    <div class="alert alert-danger alert-dismissible fade show mx-4 mt-2" role="alert">
+        <i class="fas fa-exclamation-triangle mr-1"></i> Password change failed. Please check the form again.
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
+
+{{-- 🔑 MODAL CHANGE PASSWORD --}}
+<div class="modal fade" id="changePasswordModal" tabindex="-1" role="dialog" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title font-weight-bold" id="changePasswordModalLabel">
+                    <i class="fas fa-lock mr-2"></i>Change Password
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            
+            <form action="{{ route('password.update') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    
+                    {{-- Current Password --}}
+                    <div class="form-group mb-3">
+                        <label for="current_password" class="font-weight-medium text-dark small">Current Password</label>
+                        <div class="position-relative">
+                            <input type="password" 
+                                   name="current_password" 
+                                   id="current_password" 
+                                   class="form-control pr-5 @error('current_password') is-invalid @enderror" 
+                                   placeholder="Enter current password"
+                                   required>
+                            <span class="toggle-password-btn" data-target="current_password"
+                                  style="position:absolute; right:15px; top:50%; transform:translateY(-50%); cursor:pointer; color:#6c757d; z-index:10;">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                        @error('current_password')
+                            <small class="text-danger mt-1 d-block">{{ $message }}</small>
+                        @enderror
+                    </div>
+
+                    {{-- New Password --}}
+                    <div class="form-group mb-3">
+                        <label for="new_password" class="font-weight-medium text-dark small">New Password</label>
+                        <div class="position-relative">
+                            <input type="password" 
+                                   name="new_password" 
+                                   id="new_password" 
+                                   class="form-control pr-5 @error('new_password') is-invalid @enderror" 
+                                   placeholder="Minimum 8 characters"
+                                   required>
+                            <span class="toggle-password-btn" data-target="new_password"
+                                  style="position:absolute; right:15px; top:50%; transform:translateY(-50%); cursor:pointer; color:#6c757d; z-index:10;">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                        @error('new_password')
+                            <small class="text-danger mt-1 d-block">{{ $message }}</small>
+                        @enderror
+                    </div>
+
+                    {{-- Confirm New Password --}}
+                    <div class="form-group mb-3">
+                        <label for="new_password_confirmation" class="font-weight-medium text-dark small">Confirm New Password</label>
+                        <div class="position-relative">
+                            <input type="password" 
+                                   name="new_password_confirmation" 
+                                   id="new_password_confirmation" 
+                                   class="form-control pr-5" 
+                                   placeholder="Re-enter new password"
+                                   required>
+                            <span class="toggle-password-btn" data-target="new_password_confirmation"
+                                  style="position:absolute; right:15px; top:50%; transform:translateY(-50%); cursor:pointer; color:#6c757d; z-index:10;">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer bg-light px-4 py-3">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-3">
+                        <i class="fas fa-save mr-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    const toggleButtons = document.querySelectorAll('.toggle-password-btn');
+
+    toggleButtons.forEach(btn => {
+        btn.addEventListener('click', function () {
+            const targetId = this.getAttribute('data-target');
+            const inputField = document.getElementById(targetId);
+            const icon = this.querySelector('i');
+
+            if (inputField.type === 'password') {
+                inputField.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                inputField.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        });
+    });
+
+// Buka modal secara otomatis jika terdapat error validasi password
+@if ($errors->has('current_password') || $errors->has('new_password'))
+    $('#changePasswordModal').modal('show');
+@endif
     const items = document.querySelectorAll('.switch-context');
 
     if (items.length > 0) {

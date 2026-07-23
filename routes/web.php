@@ -40,6 +40,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+    Route::post('/change-password', [AuthController::class, 'updatePassword'])->name('password.update');
     
      Route::get('/audit-trail', [AuditTrailController::class, 'index'])->name('audit-trail.index');
     Route::get('/audit-trail/{id}', [AuditTrailController::class, 'show'])->name('audit-trail.show');

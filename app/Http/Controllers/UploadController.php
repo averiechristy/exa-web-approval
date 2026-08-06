@@ -341,10 +341,14 @@ class UploadController extends Controller
                     if ($app['approver_order'] == 2) {
                         $approverUser = User::find($app['approver_id']);
                         if ($approverUser && $approverUser->email) {
-                            Mail::to($approverUser->email)
-                                ->send(new DocumentApprovalMail($document, $docApproval));
+                            try {
+                                Mail::to($approverUser->email)
+                                    ->send(new DocumentApprovalMail($document, $docApproval));
+                            } catch (\Exception $mailEx) {
+                                \Log::warning("Gagal mengirim email approval ke {$approverUser->email}: " . $mailEx->getMessage());
+                            }
                         }
-                    }
+}
                 }
 
                 // ================= AUTO APPLY REQUESTER SIGNATURE KE PDF =================

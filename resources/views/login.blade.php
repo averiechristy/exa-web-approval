@@ -32,17 +32,20 @@
             backdrop-filter: blur(10px);
         }
 
+        /* Container logo baru tanpa bulatan */
         .brand-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(78, 115, 223, 0.1);
-            color: #4e73df;
-            border-radius: 50%;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.75rem;
-            margin-bottom: 1rem;
+            margin-bottom: 1.25rem;
+            padding: 0;
+        }
+
+        /* Ukuran logo diperbesar */
+        .brand-logo {
+            max-width: 180px; 
+            height: auto;
+            object-fit: contain;
         }
 
         .input-group-custom {
@@ -128,10 +131,10 @@
                         <!-- Header -->
                         <div class="text-center mb-4">
                             <div class="brand-icon">
-                                <i class="fas fa-file-signature"></i>
+                                <img src="{{ asset('img/exa-logo.png') }}" alt="Logo Exa" class="brand-logo">
                             </div>
                             <h2 class="h4 font-weight-bold text-gray-900 mb-1">Welcome!</h2>
-                            <p class="text-muted small">Exa E-Approval System</p>
+                            <p class="text-muted small">E-Approval System</p>
                         </div>
 
                         <!-- Error Message -->

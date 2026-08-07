@@ -768,10 +768,6 @@ $('#editWorkflowForm').on('submit', function (e) {
         errorDoc.text('Document Type is required');
         $('#editDocumentType').addClass('is-invalid');
         isValid = false;
-    } else if (documentType.length > 24) {
-        errorDoc.text('Max 24 characters allowed');
-        $('#editDocumentType').addClass('is-invalid');
-        isValid = false;
     }
 
     // =====================

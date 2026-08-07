@@ -306,6 +306,12 @@
 
     $(document).ready(function () {
 
+    $('#folderSelect, #documentTypeSelect').select2({
+        placeholder: '-- Choose / Type to Search --',
+        allowClear: true,
+        width: '100%'
+    });
+
         $('.ccDropdown').each(function () {
             initSelect2($(this));
         });
@@ -2107,55 +2113,55 @@ function collectStep2Data() {
         @endif
     });
 
-    // Helper function untuk load folders & document types
-    function loadFoldersAndDocTypes(orgId) {
-        // Show loading
-        $('#folderSelect').html('<option value="">Loading folders...</option>');
-        $('#documentTypeSelect').html('<option value="">Loading document types...</option>');
+function loadFoldersAndDocTypes(orgId) {
+    // Reset Select2 & Tampilkan loading
+    $('#folderSelect').html('<option value="">Loading folders...</option>').trigger('change');
+    $('#documentTypeSelect').html('<option value="">Loading document types...</option>').trigger('change');
 
-        // Load Folders
-        $.ajax({
-            url: '/folders/by-organization/' + orgId,
-            type: 'GET',
-            success: function (res) {
-                let options = '<option value="">-- Select Folder --</option>';
-                if (res.length === 0) {
-                    options = '<option value="">No folders available</option>';
-                } else {
-                    res.forEach(function (folder) {
-                        options += `<option value="${folder.id}">${folder.name}</option>`;
-                    });
-                }
-                $('#folderSelect').html(options);
-            },
-            error: function (xhr) {
-                console.error('Folders error:', xhr);
-                $('#folderSelect').html('<option value="">Failed to load folders</option>');
+    // Load Folders
+    $.ajax({
+        url: '/folders/by-organization/' + orgId,
+        type: 'GET',
+        success: function (res) {
+            let options = '<option value="">-- Select Folder --</option>';
+            if (res.length === 0) {
+                options = '<option value="">No folders available</option>';
+            } else {
+                res.forEach(function (folder) {
+                    options += `<option value="${folder.id}">${folder.name}</option>`;
+                });
             }
-        });
+            // Tambahkan .trigger('change') agar Select2 meng-update daftarnya
+            $('#folderSelect').html(options).trigger('change');
+        },
+        error: function (xhr) {
+            console.error('Folders error:', xhr);
+            $('#folderSelect').html('<option value="">Failed to load folders</option>').trigger('change');
+        }
+    });
 
-        // Load Document Types
-        $.ajax({
-            url: '/workflows/by-organization/' + orgId,
-            type: 'GET',
-            success: function (res) {
-                let options = '<option value="">-- Select Document Type --</option>';
-                if (res.length === 0) {
-                    options = '<option value="">No document types available</option>';
-                } else {
-                    res.forEach(function (item) {
-                        options += `<option value="${item.id}">${item.document_type}</option>`;
-                    });
-                }
-                $('#documentTypeSelect').html(options);
-            },
-            error: function (xhr) {
-                console.error('Document types error:', xhr);
-                $('#documentTypeSelect').html('<option value="">Failed to load document types</option>');
+    // Load Document Types
+    $.ajax({
+        url: '/workflows/by-organization/' + orgId,
+        type: 'GET',
+        success: function (res) {
+            let options = '<option value="">-- Select Document Type --</option>';
+            if (res.length === 0) {
+                options = '<option value="">No document types available</option>';
+            } else {
+                res.forEach(function (item) {
+                    options += `<option value="${item.id}">${item.document_type}</option>`;
+                });
             }
-        });
-    }
-
+            // Tambahkan .trigger('change') agar Select2 meng-update daftarnya
+            $('#documentTypeSelect').html(options).trigger('change');
+        },
+        error: function (xhr) {
+            console.error('Document types error:', xhr);
+            $('#documentTypeSelect').html('<option value="">Failed to load document types</option>').trigger('change');
+        }
+    });
+}
     function collectCompletePayload() {
         const step1 = collectStep1Data();
         const step2 = collectStep2Data();
@@ -2360,6 +2366,48 @@ function collectStep2Data() {
 @endpush
 @push('styles')
 <style>
+/* 1. Samakan Container Utama Select2 */
+.select2-container--default .select2-selection--single {
+    height: calc(2.875rem + 2px) !important; /* Mengikuti tinggi form-control-lg */
+    padding: 0.5rem 1rem !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    color: #6e707e !important;
+    background-color: #fff !important;
+    background-clip: padding-box !important;
+    border: 1px solid #d1d5e0 !important;
+    border-radius: 0.35rem !important; /* Membuat lekukan border sama persis */
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}
+
+/* 2. Rapikan Teks Placeholder / Pilihan di Dalamnya */
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #6e707e !important;
+    padding-left: 0 !important;
+    padding-right: 20px !important;
+    line-height: 1.5 !important;
+}
+
+/* 3. Atur Posisi Panah Dropdown */
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 100% !important;
+    top: 0 !important;
+    right: 10px !important;
+}
+
+/* 4. Efek Focus (Saat Klik/Ketik Search) Samakan Dengan Bootstrap */
+.select2-container--default.select2-container--open .select2-selection--single,
+.select2-container--default .select2-selection--single:focus {
+    border-color: #bac8f3 !important;
+    outline: 0 !important;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25) !important;
+}
+
+/* 5. Rapikan Tombol Clear (x) Jika Ada */
+.select2-container--default .select2-selection--single .select2-selection__clear {
+    margin-right: 10px !important;
+    color: #e74a3b !important;
+}
     .pdf-area {
         position: relative;
         background: #000;

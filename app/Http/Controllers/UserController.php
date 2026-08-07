@@ -222,6 +222,57 @@ public function resetPassword(User $user)
     /**
      * Set user status to inactive
      */
+
+    public function active(User $user)
+{
+    try {
+        $user->update([
+            'is_active' => 1,
+        ]);
+
+        // Load relasi agar data di log lengkap
+        $user->load([
+            'systemRole',
+            'userAccesses.organization',
+            'userAccesses.division',
+            'userAccesses.role',
+            'userAccesses.manager'
+        ]);
+
+        // Dispatch Activity Log for Activate User
+        LogActivityJob::dispatchSync(
+            logName: 'user',
+            causedBy: auth()->user(),
+            performedOn: $user,
+            event: 'user.activated',
+            description: 'Activate User',
+            properties: [
+                'attributes' => [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'username' => $user->username,
+                    'system_role' => $user->systemRole?->system_role_name,
+                    'is_active' => 'Active',
+                    'access' => $user->userAccesses->map(function ($access) {
+                        return [
+                            'organization' => $access->organization?->organization_name,
+                            'division' => $access->division?->division_name,
+                            'role' => $access->role?->role_name,
+                            'manager' => $access->manager?->name,
+                        ];
+                    })->values(),
+                ],
+            ],
+        );
+
+        return redirect()->route('user.index')
+            ->with('success', 'User ' . $user->username . ' has been activated.');
+
+    } catch (\Exception $e) {
+        return redirect()->route('user.index')
+            ->with('error', 'Failed to activate user.');
+    }
+}
     public function inactive(User $user)
     {
         // Guard: Prevent self-deactivation
@@ -271,17 +322,17 @@ public function resetPassword(User $user)
                 ->with('error', 'Failed to deactivate user.');
         }
     }
-    public function destroy(User $user)
-    {
-        try {
-            $this->userService->deleteUser($user);
+public function destroy(User $user)
+{
+    try {
+        $this->userService->deleteUser($user);
 
-            return redirect()->route('user.index')
-                ->with('success', 'Success Delete Data');
-        } catch (\Exception $e) {
-            return redirect()->route('user.index')
-                ->with('error', $e->getMessage());
-        }
+        return redirect()->route('user.index')
+            ->with('success', 'Success Delete Data');
+    } catch (\Exception $e) {
+        return redirect()->route('user.index')
+            ->with('error', $e->getMessage());
     }
+}
 
 }

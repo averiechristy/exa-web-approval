@@ -210,8 +210,7 @@ class UserService
 
         // Tidak boleh dihapus jika masih digunakan
         if (
-            $user->userAccesses()->exists() ||
-            $user->documentApprovals()->exists()
+            $user->documentapproval()->exists()
         ) {
             throw new \Exception('User cannot be deleted because it is already used.');
         }

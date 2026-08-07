@@ -143,113 +143,113 @@ class UploadController extends Controller
             ]);
     }
 
-    public function getWorkflowApprovers($workflowId, Request $request)
-    {
-        $orgId = $request->organization_id;
-        $requesterDivisionId = $request->division_id;   // division requester
-        $currentUser = auth()->user();
-        $activeRoleId = session('active_role_id');
+public function getWorkflowApprovers($workflowId, Request $request)
+{
+    $orgId = $request->organization_id;
+    $requesterDivisionId = $request->division_id;   // division requester
+    $currentUser = auth()->user();
+    $activeRoleId = session('active_role_id');
 
-        $activeRoleLevel = Role::where('id', $activeRoleId)->value('role_level');
-        $highestRoleLevel = Role::max('role_level');
-        // Ambil workflow steps
-        $workflowSteps = WorkflowStep::with('division')
-            ->where('workflow_id', $workflowId)
-            ->orderBy('tier')
-            ->get();
+    $activeRoleLevel = Role::where('id', $activeRoleId)->value('role_level');
+    $highestRoleLevel = Role::max('role_level');
 
-        $result = [];
-        $isRequesterHighestRole = ($activeRoleLevel == $highestRoleLevel);
+    // Ambil workflow steps
+    $workflowSteps = WorkflowStep::with('division')
+        ->where('workflow_id', $workflowId)
+        ->orderBy('tier')
+        ->get();
 
+    $result = [];
+    $isRequesterHighestRole = ($activeRoleLevel == $highestRoleLevel);
 
-        // ================== GROUP 1: Same Division - Higher Role ==================
-        
-        // Masukkan sebagai Tier 0 atau "Direct Superior"
-       if (!$isRequesterHighestRole) {
-       $sameDivisionUsers = UserAccess::with(['user', 'role'])
+    // ================== GROUP 1: Same Division - Higher Role ==================
+    if (!$isRequesterHighestRole) {
+        $sameDivisionUsers = UserAccess::with(['user', 'role'])
             ->where('organization_id', $orgId)
             ->where('division_id', $requesterDivisionId)
             // ->where('user_id', '!=', $currentUser->id)
             ->whereHas('role', function ($q) use ($activeRoleLevel) {
-                $q->where('role_level', '>', $activeRoleLevel);   // Hanya yang lebih tinggi
+                // Safeguard activeRoleLevel as well
+                $level = $activeRoleLevel ?? 0;
+                $q->where('role_level', '>', $level);   // Hanya yang lebih tinggi
             })
             ->get()
             ->map(function($access) {
                 return [
-                    'id'         => $access->user->id,
-                    'name'       => $access->user->name,
-                    'role_name'  => $access->role->role_name ?? '',
-                    'role_level' => $access->role->role_level,
+                    'id'         => $access->user?->id,
+                    'name'       => $access->user?->name ?? 'Unknown User',
+                    'role_name'  => $access->role?->role_name ?? '',
+                    'role_level' => $access->role?->role_level,
                     'source'     => 'same_division'
                 ];
             });
-            
-
 
         if ($sameDivisionUsers->isNotEmpty()) {
             $division = Division::find($requesterDivisionId);
             $result[] = [
-                'tier'          => 0,
-                'title'         => "Tier 0 • Direct Superior",
-                'division_name' => $division->division_name ?? 'Unknown',
-                'division_id'   => $division?->id ?? '',
-                'sla_days'      => 0,
-                'users'         => $sameDivisionUsers,
-                'is_same_division' => true,
+                'tier'                 => 0,
+                'title'                => "Tier 0 • Direct Superior",
+                'division_name'        => $division->division_name ?? 'Unknown',
+                'division_id'          => $division?->id ?? '',
+                'sla_days'             => 0,
+                'users'                => $sameDivisionUsers,
+                'is_same_division'     => true,
                 'is_requester_highest' => false
             ];
         }
     } else {
         // Optional: Kirim info ke frontend
         $result[] = [
-            'tier'          => 0,
-            'title'         => "Tier 0",
-            'division_name' => 'Highest Role',
-            'division_id'   => $requesterDivisionId,
-            'sla_days'      => 0,
-            'users'         => [],
-            'is_same_division' => true,
+            'tier'                 => 0,
+            'title'                => "Tier 0",
+            'division_name'        => 'Highest Role',
+            'division_id'          => $requesterDivisionId,
+            'sla_days'             => 0,
+            'users'                => [],
+            'is_same_division'     => true,
             'is_requester_highest' => true   // Flag penting
         ];
     }
 
-        // ================== GROUP 2: Workflow Tiers ==================
-        foreach ($workflowSteps as $step) {
-            $users = UserAccess::with(['user', 'role'])
-                ->where('organization_id', $orgId)
-                ->where('division_id', $step->division_id)
-                ->where('user_id', '!=', $currentUser->id)
-                ->whereHas('role', function($q) use ($step) {
-                    $q->where('role_level', '>=', $step->min_role_level);
-                })
-                ->get()
-                ->map(function($access) {
-                    return [
-                        'id'         => $access->user->id,
-                        'name'       => $access->user->name,
-                        'role_name'  => $access->role->role_name ?? '',
-                        'role_level' => $access->role->role_level,
-                        'source'     => 'workflow'
-                    ];
-                });
+    // ================== GROUP 2: Workflow Tiers ==================
+    foreach ($workflowSteps as $step) {
+        $users = UserAccess::with(['user', 'role'])
+            ->where('organization_id', $orgId)
+            ->where('division_id', $step->division_id)
+            ->where('user_id', '!=', $currentUser->id)
+            ->whereHas('role', function($q) use ($step) {
+                // FIX: Fallback to 0 if min_role_level is null to prevent Illegal Operator Exception
+                $minLevel = $step->min_role_level ?? 0;
+                $q->where('role_level', '>=', $minLevel);
+            })
+            ->get()
+            ->map(function($access) {
+                return [
+                    'id'         => $access->user?->id,
+                    'name'       => $access->user?->name ?? 'Unknown User',
+                    'role_name'  => $access->role?->role_name ?? '',
+                    'role_level' => $access->role?->role_level,
+                    'source'     => 'workflow'
+                ];
+            });
 
-            $result[] = [
-                'tier'          => $step->tier,
-                'title'         => "Tier {$step->tier}",
-                'division_name' => $step->division?->division_name ?? 'Unknown',
-                'division_id'   => $step->division?->id ?? '',
-                'sla_days'      => $step->sla_days,
-                'users'         => $users,
-                'is_same_division' => false
-            ];
-        }
-
-        return response()->json([
-            'success' => true,
-            'workflow_steps' => $result,
-            'requester_is_highest_role' => $isRequesterHighestRole
-        ]);
+        $result[] = [
+            'tier'             => $step->tier,
+            'title'            => "Tier {$step->tier}",
+            'division_name'    => $step->division?->division_name ?? 'Unknown',
+            'division_id'      => $step->division?->id ?? '',
+            'sla_days'         => $step->sla_days,
+            'users'            => $users,
+            'is_same_division' => false
+        ];
     }
+
+    return response()->json([
+        'success' => true,
+        'workflow_steps' => $result,
+        'requester_is_highest_role' => $isRequesterHighestRole
+    ]);
+}
     /**
      * Show the form for creating a new resource.
      */

@@ -156,7 +156,6 @@ class WorkflowService
     {
 
         if (
-            $workflow->workflowstep()->exists() ||
             $workflow->documents()->exists()
         ) {
             throw new \Exception('Workflow cannot be deleted because it is already used.');

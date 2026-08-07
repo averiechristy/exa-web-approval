@@ -5,7 +5,7 @@
 @section('content')
 
 <div class="container-fluid">
-    @include('components.alert')
+   
     <h1 class="h4 mb-4 text-gray-800">Organization</h1>
 
     <div class="card shadow mb-4">

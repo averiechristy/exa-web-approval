@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use DB;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -16,7 +17,24 @@ class WorkflowRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'document_type' => ['required', 'string', 'max:24'],
+            'document_type' => [
+    'required',
+    'string',
+    function ($attribute, $value, $fail) {
+        $exists = DB::table('workflows')
+            ->whereNull('deleted_at')
+            ->where('organization_id', $this->organization_id)
+            ->whereRaw('LOWER(document_type) = ?', [strtolower($value)])
+            ->when($this->route('workflow'), function ($query) {
+                $query->where('id', '!=', $this->route('workflow')->id);
+            })
+            ->exists();
+
+        if ($exists) {
+            $fail('The document type has already been taken for this organization.');
+        }
+    },
+],
             'organization_id'=>['required'],
 
             'steps' => ['required', 'array', 'min:1'],
@@ -44,12 +62,13 @@ class WorkflowRequest extends FormRequest
     }
 
     protected function failedValidation(Validator $validator)
-    {
-        throw new HttpResponseException(
-            response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422)
-        );
-    }
+{
+    throw new HttpResponseException(
+        redirect()
+            ->back()
+            ->withInput()
+            ->withErrors($validator)
+    );
+}
+    
 }

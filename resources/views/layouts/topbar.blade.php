@@ -111,7 +111,25 @@
         </button>
     </div>
 @endif
+@if (session('error'))
+    <div class="alert alert-danger alert-dismissible fade show mx-4 mt-2" role="alert">
+        <i class="fas fa-exclamation-triangle mr-1"></i> {{ session('error') }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
 
+@if ($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show mx-4 mt-2" role="alert">
+        <i class="fas fa-exclamation-triangle mr-1"></i>
+        {{ $errors->first() }}
+
+        <button type="button" class="close" data-dismiss="alert">
+            <span>&times;</span>
+        </button>
+    </div>
+@endif
 @if ($errors->has('current_password') || $errors->has('new_password'))
     <div class="alert alert-danger alert-dismissible fade show mx-4 mt-2" role="alert">
         <i class="fas fa-exclamation-triangle mr-1"></i> Password change failed. Please check the form again.

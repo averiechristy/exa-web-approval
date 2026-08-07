@@ -5,7 +5,6 @@
 @section('content')
 
 <div class="container-fluid">
-    @include('components.alert')
 
     <h1 class="h4 mb-4 text-gray-800">Folder</h1>
 
@@ -253,7 +252,8 @@ $(document).on('submit', '.editForm', function(e) {
 
     let form = $(this);
 
-    let org = form.find('.edit-org');
+    // Ambil value organization_id baik dari select biasa maupun hidden input jika disabled
+    let orgVal = form.find('[name="organization_id"]').val();
     let name = form.find('.edit-name');
     let parent = form.find('.edit-parent');
 
@@ -268,20 +268,19 @@ $(document).on('submit', '.editForm', function(e) {
     errName.text('');
     errParent.text('');
 
-    org.removeClass('is-invalid');
+    form.find('.edit-org').removeClass('is-invalid');
     name.removeClass('is-invalid');
     parent.removeClass('is-invalid');
 
     // ✅ VALIDASI ORGANIZATION
-    if (!org.val()) {
+    if (!orgVal) {
         errOrg.text('Organization is required');
-        org.addClass('is-invalid');
+        form.find('.edit-org').addClass('is-invalid');
         valid = false;
     }
 
     // ✅ VALIDASI NAME
     let value = name.val().trim();
-
     if (value === '') {
         errName.text('Folder name is required');
         name.addClass('is-invalid');
@@ -296,9 +295,8 @@ $(document).on('submit', '.editForm', function(e) {
         valid = false;
     }
 
-    // ✅ VALIDASI PARENT (optional tapi bagus)
+    // ✅ VALIDASI PARENT
     let currentId = form.closest('.modal').attr('id').replace('editModal', '');
-
     if (parent.val() == currentId) {
         errParent.text('Cannot set itself as parent');
         parent.addClass('is-invalid');
@@ -324,6 +322,27 @@ $(document).on('submit', '.editForm', function(e) {
     });
 });
 
+$(document).on('show.bs.modal', '[id^=editModal]', function () {
+    let modal = $(this);
+    let form = modal.find('.editForm');
+    
+    // Ambil value organization_id dari select atau hidden input
+    let orgId = form.find('[name="organization_id"]').val();
+    let parentSelect = form.find('.edit-parent');
+
+    let currentId = modal.attr('id').replace('editModal', '');
+    let selectedParent = parentSelect.data('selected'); 
+
+    parentSelect.html('<option value="">-- Root --</option>');
+
+    let filtered = folders.filter(f => f.organization_id == orgId);
+
+    parentSelect.append(
+        buildParentOptions(filtered, null, '', currentId)
+    );
+
+    parentSelect.val(selectedParent);
+});
 function buildParentOptions(folders, parentId = null, path = '', excludeId = null) {
     let result = '';
 

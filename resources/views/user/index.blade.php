@@ -4,7 +4,6 @@
 
 @section('content')
 <div class="container-fluid">
-    @include('components.alert')
 
     <h1 class="h4 mb-4 text-gray-800">User</h1>
 
@@ -78,13 +77,24 @@
                         </button>
 
                         {{-- Inactive Button --}}
-                        <button class="btn btn-sm btn-light inactiveBtn" 
-                                data-id="{{ $item->id }}" 
-                                data-username="{{ $item->username }}" 
-                                title="{{ auth()->id() == $item->id ? 'You cannot deactivate yourself' : 'Inactive User' }}"
-                                {{ auth()->id() == $item->id || !$item->is_active ? 'disabled' : '' }}>
-                            <i class="fas fa-user-slash {{ auth()->id() == $item->id || !$item->is_active ? 'text-muted' : 'text-secondary' }}"></i>
-                        </button>
+                        @if ($item->is_active)
+    {{-- Inactive Button --}}
+    <button class="btn btn-sm btn-light inactiveBtn" 
+            data-id="{{ $item->id }}" 
+            data-username="{{ $item->username }}"
+            title="{{ auth()->id() == $item->id ? 'You cannot deactivate yourself' : 'Inactive User' }}"
+            {{ auth()->id() == $item->id ? 'disabled' : '' }}>
+        <i class="fas fa-user-slash {{ auth()->id() == $item->id ? 'text-muted' : 'text-secondary' }}"></i>
+    </button>
+@else
+    {{-- Active Button --}}
+    <button class="btn btn-sm btn-light activeBtn"
+            data-id="{{ $item->id }}"
+            data-username="{{ $item->username }}"
+            title="Activate User">
+        <i class="fas fa-user-check text-success"></i>
+    </button>
+@endif
 
                         {{-- Delete Button --}}
                         <button class="btn btn-sm btn-light deleteBtn" 
@@ -362,6 +372,10 @@
 
 <!-- Form Hidden untuk Inactive User -->
 <form id="globalInactiveForm" method="POST" style="display:none;">
+    @csrf
+</form>
+<!-- Form Hidden untuk Active User -->
+<form id="globalActiveForm" method="POST" style="display:none;">
     @csrf
 </form>
 @endsection
@@ -1166,6 +1180,30 @@ $(document).ready(function() {
             }
         });
     });
+
+    // --- ACTIVE USER HANDLER ---
+$('.activeBtn').on('click', function() {
+    let id = $(this).data('id');
+    let username = $(this).data('username');
+
+    Swal.fire({
+        title: 'Activate User?',
+        text: `User "${username}" will be set to active.`,
+        icon: 'question',
+        showCancelButton: true,
+        reverseButtons: true,
+        confirmButtonColor: '#1cc88a',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, Activate!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            let form = $('#globalActiveForm');
+            form.attr('action', '/user/' + id + '/active');
+            form.submit();
+        }
+    });
+});
 });
 </script>
 @endpush

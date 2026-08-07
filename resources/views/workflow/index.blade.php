@@ -6,7 +6,6 @@
 
 <div class="container-fluid">
 
-    @include('components.alert')
 
     <h1 class="h4 mb-4 text-gray-800">Work Flow</h1>
 
@@ -420,10 +419,6 @@ $(document).on("click", ".removeWorkflow", function () {
         // VALIDASI DOCUMENT TYPE
         if (documentType.length < 1) {
             errorDoc.text('Document Type is required');
-            $('#documentType').addClass('is-invalid');
-            isValid = false;
-        } else if (documentType.length > 24) {
-            errorDoc.text('Max 24 characters allowed');
             $('#documentType').addClass('is-invalid');
             isValid = false;
         }

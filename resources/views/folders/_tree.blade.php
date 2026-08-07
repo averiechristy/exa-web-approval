@@ -52,19 +52,32 @@
                     <div class="modal-body">
 
                         <!-- ORGANIZATION -->
-                        <div class="mb-2">
-                            <label>Organization</label>
-                            <select name="organization_id" class="form-control edit-org">
-                                <option value="">-- Select --</option>
-                                @foreach($organizations as $org)
-                                    <option value="{{ $org->id }}"
-                                        @selected($folder->organization_id == $org->id)>
-                                        {{ $org->organization_name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <small class="text-danger error-org"></small>
-                        </div>
+                       <div class="mb-2">
+    <label>Organization</label>
+    
+    @php
+        // Cek apakah folder ini sub-folder ATAU punya children
+        $isOrgLocked = !is_null($folder->parent_id) || $folder->children->count() > 0;
+    @endphp
+
+    <select name="organization_id" 
+            class="form-control edit-org" 
+            {{ $isOrgLocked ? 'disabled' : '' }}>
+        @foreach($organizations as $org)
+            <option value="{{ $org->id }}" {{ $folder->organization_id == $org->id ? 'selected' : '' }}>
+                {{ $org->organization_name }}
+            </option>
+        @endforeach
+    </select>
+
+    <!-- PENTING: Jika disabled, nilai select tidak akan terkirim via POST. 
+         Tambahkan hidden input agar value organization_id tetap terkirim ke backend. -->
+    @if($isOrgLocked)
+        <input type="hidden" name="organization_id" value="{{ $folder->organization_id }}">
+    @endif
+
+    <small class="text-danger error-org"></small>
+</div>
 
                         <!-- PARENT -->
                         <div class="mb-2">

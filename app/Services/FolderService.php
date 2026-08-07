@@ -47,49 +47,76 @@ class FolderService
     }
 
     public function updateFolder($data, $folder)
-    {
-        $folder->load([
-            'organization',
-            'parent',
-        ]);
+{
+    $folder->load([
+        'organization',
+        'parent',
+        'children', // 1. Load relasi children untuk pengecekan
+    ]);
 
-        $oldData = [
-            'folder_name' => $folder->folder_name,
-            'organization' => $folder->organization?->organization_name,
-            'parent_folder' => $folder->parent?->folder_name,
-        ];
+    // 2. LOGIKA PROTEKSI ORGANIZATION:
+    // Jika folder ini adalah sub-folder (punya parent_id) ATAU punya sub-folder (children tidak kosong)
+    $hasChildren = $folder->children->isNotEmpty();
+    $isSubFolder = !is_null($folder->parent_id);
 
-        $folder->update([
-            'organization_id' => $data['organization_id'],
-            'parent_id' => $data['parent_id'] ?? null,
-            'folder_name' => $data['folder_name']
-        ]);
-
-        $folder->refresh()->load([
-            'organization',
-            'parent',
-        ]);
-
-        $newData = [
-            'folder_name' => $folder->folder_name,
-            'organization' => $folder->organization?->organization_name,
-            'parent_folder' => $folder->parent?->folder_name,
-        ];
-
-        LogActivityJob::dispatchSync(
-            logName: 'folder',
-            causedBy: auth()->user(),
-            performedOn: $folder,
-            event: 'folder.updated',
-            description: 'Update Folder',
-            properties: [
-                'old' => $oldData,
-                'attributes' => $newData,
-            ],
-        );
-
-        return $folder;
+    if ($hasChildren || $isSubFolder) {
+        // Jika dipindah ke parent lain yang valid, paksa organization_id mengikuti parent baru
+        if (!empty($data['parent_id'])) {
+            $parentFolder = Folder::findOrFail($data['parent_id']);
+            $organizationId = $parentFolder->organization_id;
+        } else {
+            // Jika tetap di posisinya/root, paksa tetap gunakan organization_id lama
+            $organizationId = $folder->organization_id;
+        }
+    } else {
+        // Jika folder root murni (tidak punya children & tidak punya parent), 
+        // gunakan organization_id dari request (atau dari parent baru jika diset)
+        if (!empty($data['parent_id'])) {
+            $parentFolder = Folder::findOrFail($data['parent_id']);
+            $organizationId = $parentFolder->organization_id;
+        } else {
+            $organizationId = $data['organization_id'];
+        }
     }
+
+    $oldData = [
+        'folder_name' => $folder->folder_name,
+        'organization' => $folder->organization?->organization_name,
+        'parent_folder' => $folder->parent?->folder_name,
+    ];
+
+    // 3. Update folder dengan $organizationId yang sudah dikunci/disesuaikan
+    $folder->update([
+        'organization_id' => $organizationId,
+        'parent_id' => $data['parent_id'] ?? null,
+        'folder_name' => $data['folder_name']
+    ]);
+
+    $folder->refresh()->load([
+        'organization',
+        'parent',
+    ]);
+
+    $newData = [
+        'folder_name' => $folder->folder_name,
+        'organization' => $folder->organization?->organization_name,
+        'parent_folder' => $folder->parent?->folder_name,
+    ];
+
+    LogActivityJob::dispatchSync(
+        logName: 'folder',
+        causedBy: auth()->user(),
+        performedOn: $folder,
+        event: 'folder.updated',
+        description: 'Update Folder',
+        properties: [
+            'old' => $oldData,
+            'attributes' => $newData,
+        ],
+    );
+
+    return $folder;
+}
 
     public function deleteFolder(Folder $folder)
     {

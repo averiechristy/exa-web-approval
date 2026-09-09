@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Inbox')
+@section('title', 'Shared')
 
 <style>
     .hover-shadow {
@@ -9,18 +9,87 @@
         transform: translateY(-3px);
         box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
     }
+
+    .hover-shadow {
+        transition: all 0.25s ease;
+    }
+    .hover-shadow:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+    }
+
+    /* Custom Override Select2 Bootstrap 4/SB Admin 2 */
+.select2-container--bootstrap4 .select2-selection--single {
+    height: 31px !important;
+    min-height: 31px !important;
+    padding: 0 !important;
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
+    line-height: 1.2 !important;
+    color: #6e707e !important;
+    background-color: #fff !important;
+    border: 1px solid #d1d3e2 !important;
+    border-radius: .35rem !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
+}
+
+/* Mengatur posisi teks placeholder & teks terpilih */
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+    display: flex !important;
+    align-items: center !important;
+    line-height: 1.2 !important;
+    padding: 0 36px 0 12px !important;
+    color: #6e707e !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+/* Mengatur warna teks placeholder saat belum ada yang dipilih */
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__placeholder {
+    color: #858796 !important;
+}
+
+/* Mengatur panah dropdown (caret) agar presisi di tengah */
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow {
+    height: 100% !important;
+    top: 50% !important;
+    right: 10px !important;
+    transform: translateY(-50%) !important;
+}
+
+.select2-container--bootstrap4 .select2-selection__clear {
+    color: #111827 !important;
+    font-size: 18px !important;
+    right: 28px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+}
+
+/* Style saat input fokus/diklik */
+.select2-container--bootstrap4.select2-container--focus .select2-selection--single {
+    border-color: #bac8f3 !important;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25) !important;
+}
+
 </style>
 
 @section('content')
 <div class="container-fluid">
             <h1 class="h3 mb-4 text-gray-800">Shared Document</h1>
 
-
+<!-- 
     @if(session('success'))
         <div class="alert alert-success">
             {{ session('success') }}
         </div>
-    @endif
+    @endif -->
     
 
     {{-- Documents Section - Hanya tampil jika sedang di dalam folder --}}
@@ -28,16 +97,6 @@
         <div class="d-flex justify-content-between mb-3">
 
 
-            <!-- Search Input -->
-            <input 
-                type="text" 
-                id="searchInput"
-                name="search"
-                class="form-control"
-                placeholder="Search document name..."
-                value="{{ request('search') }}"
-                style="width: 280px;"
-            >
         </div>
 
             <!-- Filter -->
@@ -45,9 +104,13 @@
             <div class="card-body">
                 <form method="GET" action="{{ route('shared.index') }}">
                     <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label class="small font-weight-bold">Document Name</label>
+                            <input type="text" id="searchInput" name="search" class="form-control form-control-sm" placeholder="Search document name..." value="{{ request('search') }}">
+                        </div>
                         <div class="col-md-2">
                             <label class="small font-weight-bold">Status</label>
-                            <select class="form-control" name="status">
+                            <select class="form-control form-control-sm" name="status">
                                 <option value="">All Status</option>
                                 <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
                                 <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
@@ -55,32 +118,31 @@
                                 <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="small font-weight-bold">Requester</label>
-                            <select class="form-control" name="requester_id">
-                                <option value="">All Requesters</option>
-                                @foreach($userOptions as $user)
-                                    <option value="{{ $user->id }}" {{ request('requester_id') == $user->id ? 'selected' : '' }}>
-                                        {{ $user->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+                            <div class="col-md-3">
+    <label class="small font-weight-bold">Requester</label>
+    <select class="form-control form-control-sm select2" id="requesterSelect" name="requester_id">
+        <option value="">All Requesters</option>
+        @foreach($userOptions as $user)
+            <option value="{{ $user->id }}" {{ request('requester_id') == $user->id ? 'selected' : '' }}>
+                {{ $user->name }} ({{ $user->username }})
+            </option>
+        @endforeach
+    </select>
+</div>
                         <div class="col-md-2">
                             <label class="small font-weight-bold">From</label>
-                            <input type="date" class="form-control" name="from_date" value="{{ request('from_date') }}">
+                            <input type="date" class="form-control form-control-sm" name="from_date" value="{{ request('from_date') }}">
                         </div>
                         <div class="col-md-2">
                             <label class="small font-weight-bold">To</label>
-                            <input type="date" class="form-control" name="to_date" value="{{ request('to_date') }}">
+                            <input type="date" class="form-control form-control-sm" name="to_date" value="{{ request('to_date') }}">
                         </div>
-                        <div class="col-md-3">
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-primary" type="submit" style="margin-right: 10px;">
+                        <div class="col-12 text-right mt-3">
+                            <div class="d-flex">
+                                <button class="btn btn-primary btn-sm mr-1" type="submit">
                                     <i class="fas fa-filter"></i> Apply Filter
                                 </button>
-                                <a href="{{ route('shared.index') }}" 
-                                class="btn btn-secondary flex-fill">
+                                <a href="{{ route('shared.index') }}" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-undo"></i> Reset
                                 </a>
                             </div>
@@ -156,6 +218,10 @@
 
 
 <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
+@push('scripts')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
 // Bulk Action Script
 const selectAll = document.getElementById('selectAll');
@@ -163,6 +229,13 @@ const checkboxes = document.querySelectorAll('.rowCheckbox');
 const bulkExportBtn = document.getElementById('bulkExportBtn');
 
 let searchTimer;
+
+$('#requesterSelect').select2({
+        theme: 'bootstrap4',
+        placeholder: 'Search requester...',
+        allowClear: true,
+        width: '100%'
+    });
 $('#searchInput').on('keyup', function () {
     clearTimeout(searchTimer);
 
@@ -311,4 +384,5 @@ $('#folderSearchInput').on('keyup', function () {
     }, 500);
 });
 </script>
+@endpush
 @endsection

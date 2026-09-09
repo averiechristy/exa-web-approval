@@ -107,24 +107,32 @@
                             </td>
                         </tr>
                         
-                        <tr>
+                      <tr>
                             <td><strong>Document Name</strong></td>
-                            <td>{{ $document->document_name }}</td>
+                            <td title="{{ $document->document_name }}">
+                                {{ Str::limit($document->document_name, 15, '...') }}
+                            </td>
                         </tr>
                         <tr>
                             <td><strong>Created At</strong></td>
-                            <td>{{ $document->created_at->format('d M Y H:i') }}</td>
+                            <td>{{ $document->created_at->format('d F Y H:i') }}</td>
                         </tr>
                     </table>
 
                     @php
                         $myApproval = $document->documentApprovals->first();
                     @endphp
-                    
-                    <div class="mt-3 pt-3 border-top">
-                        <strong class="text-danger">Rejection Reason:</strong>
-                        <p class="mb-0 text-muted small">{{ $myApproval->remarks ?? '-'}}</p>
-                    </div>
+
+@if($status == 'Rejected' && $myApproval)
+    <div class="mt-3 pt-3 border-top">
+        <strong class="text-danger">
+            Rejected By {{ optional($myApproval->approver)->name ?? 'Unknown User' }} - {{ optional($myApproval->updated_at)->format('d F Y H:i') }}
+        </strong>
+        <p class="mb-0 text-muted small mt-1">
+            Reason: {{ $myApproval->remarks ?? '-' }}
+        </p>
+    </div>
+@endif
 
                 </div>
             </div>

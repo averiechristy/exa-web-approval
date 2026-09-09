@@ -9,13 +9,113 @@
         transform: translateY(-3px);
         box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
     }
+
+    .hover-shadow {
+        transition: all 0.25s ease;
+    }
+    .hover-shadow:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+    }
+
+    .select2-container {
+    width: 100% !important;
+}
+
+.select2-container--bootstrap4 .select2-selection--single {
+    height: 31px !important;
+    min-height: 31px !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 0.25rem !important;
+    background: #fff !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
+}
+
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+    display: flex !important;
+    align-items: center !important;
+    line-height: 1.2 !important;
+    padding: 0 36px 0 12px !important;
+    color: #111827 !important;
+    font-size: 0.875rem !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__placeholder {
+    color: #6b7280 !important;
+}
+
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow {
+    height: 100% !important;
+    width: 28px !important;
+    right: 2px !important;
+    background: transparent !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+}
+
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow b {
+    border-color: #111827 transparent transparent transparent !important;
+    border-width: 6px 5px 0 5px !important;
+    margin-left: -4px !important;
+    margin-top: -2px !important;
+}
+
+.select2-container--bootstrap4.select2-container--focus .select2-selection--single {
+    border-color: #111827 !important;
+    box-shadow: none !important;
+}
+
+.select2-container--bootstrap4 .select2-dropdown {
+    border: 2px solid #1f1f1f !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.select2-container--bootstrap4 .select2-results__option {
+    padding: 10px 12px !important;
+    font-size: 0.95rem !important;
+    color: #111827 !important;
+    background: #fff !important;
+}
+
+.select2-container--bootstrap4 .select2-results__option--highlighted {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+}
+
+.select2-container--bootstrap4 .select2-search__field {
+    border: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+    padding: 10px 12px !important;
+    outline: none !important;
+}
+
+.select2-container--bootstrap4 .select2-selection__clear {
+    color: #111827 !important;
+    font-size: 18px !important;
+    right: 28px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+}
+
 </style>
 
 @section('content')
 <div class="container-fluid">
     <h1 class="h3 mb-4 text-gray-800">Inbox</h1>
 
-    @if(session('success'))
+    <!-- @if(session('success'))
         <div class="alert alert-success">
             {{ session('success') }}
         </div>
@@ -25,7 +125,7 @@
         <div class="alert alert-danger">
             {{ session('error') }}
         </div>
-    @endif
+    @endif -->
 
     {{-- Documents Section - Hanya tampil jika sedang di dalam folder --}}
  
@@ -39,67 +139,81 @@
                     <i class="fas fa-check-circle"></i> Approve
                 </button>
             </div>
-
-            <!-- Search Input -->
-            <input 
-                type="text" 
-                id="searchInput"
-                name="search"
-                class="form-control"
-                placeholder="Search document name..."
-                value="{{ request('search') }}"
-                style="width: 280px;"
-            >
         </div>
     <!-- Filter -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <form method="GET" action="{{ route('inbox.index') }}">
-                    <div class="row align-items-end">
-                        <div class="col-md-2">
-                            <label class="small font-weight-bold">Status</label>
-                            <select class="form-control" name="status">
-                                <option value="">All Status</option>
-                                <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
-                                <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
-                                <option value="Approved" {{ request('status') == 'Approved' ? 'selected' : '' }}>Approved</option>
-                                <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="small font-weight-bold">Requester</label>
-                            <select class="form-control" name="requester_id">
-                                <option value="">All Requesters</option>
-                                @foreach($userOptions as $user)
-                                    <option value="{{ $user->id }}" {{ request('requester_id') == $user->id ? 'selected' : '' }}>
-                                        {{ $user->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small font-weight-bold">From</label>
-                            <input type="date" class="form-control" name="from_date" value="{{ request('from_date') }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small font-weight-bold">To</label>
-                            <input type="date" class="form-control" name="to_date" value="{{ request('to_date') }}">
-                        </div>
-                        <div class="col-md-3">
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-primary" type="submit" style="margin-right: 10px;">
-                                    <i class="fas fa-filter"></i> Apply Filter
-                                </button>
-                                <a href="{{ route('inbox.index') }}" 
-                                class="btn btn-secondary flex-fill">
-                                    <i class="fas fa-undo"></i> Reset
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </form>
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ route('inbox.index') }}">
+            <div class="row g-2 align-items-end">
+                <!-- Document Name -->
+                <div class="col-lg-3 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-1">Document Name</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search document name..." value="{{ request('search') }}">
+                </div>
+
+                <!-- Status -->
+                <div class="col-lg-2 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-1">Status</label>
+                    <select class="form-control form-control-sm" name="status">
+                        <option value="">All Status</option>
+                        <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
+                        <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
+                        <option value="Approved" {{ request('status') == 'Approved' ? 'selected' : '' }}>Approved</option>
+                        <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
+                    </select>
+                </div>
+
+                <!-- Requester -->
+                <div class="col-lg-3 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-1">Requester</label>
+                    <select class="form-control form-control-sm select2" id="requesterSelect" name="requester_id">
+                        <option value="">All Requesters</option>
+                        @foreach($userOptions as $user)
+                            <option value="{{ $user->id }}" {{ request('requester_id') == $user->id ? 'selected' : '' }}>
+                                {{ $user->name }} ({{ $user->username }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Addressee -->
+                <div class="col-lg-3 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-1">Addressee</label>
+                    <select class="form-control form-control-sm select2" id="addresseeSelect" name="addressee_id">
+                        <option value="">All Addressees</option>
+                        @foreach($addresseeOptions as $user)
+                            <option value="{{ $user->id }}" {{ request('addressee_id') == $user->id ? 'selected' : '' }}>
+                                {{ $user->name }} ({{ $user->username }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- From Date -->
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label small font-weight-bold text-muted mb-1">From</label>
+                    <input type="date" class="form-control form-control-sm" name="from_date" value="{{ request('from_date') }}">
+                </div>
+
+                <!-- To Date -->
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label small font-weight-bold text-muted mb-1">To</label>
+                    <input type="date" class="form-control form-control-sm" name="to_date" value="{{ request('to_date') }}">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="col-12 text-end mt-3">
+                    <button class="btn btn-primary btn-sm me-1" type="submit">
+                        <i class="fas fa-filter me-1"></i> Apply Filter
+                    </button>
+                    <a href="{{ route('inbox.index') }}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-undo me-1"></i> Reset
+                    </a>
+                </div>
             </div>
-        </div>
+        </form>
+    </div>
+</div>
         
         <!-- Documents -->
         <div class="card shadow mb-4">
@@ -115,67 +229,90 @@
                                 <th>Created Time</th>
                                 <th>Last Modified</th>
                                 <th>Requester</th>
+                                <th>Addressee</th>
                                 <th width="180">Action</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            @forelse($documents as $document)
-                            <tr>
-                                <td><input type="checkbox" class="rowCheckbox" value="{{ $document->id }}"></td>
-                                <td>
-                                    <strong>{{ $document->document_name }}</strong>
-                                </td>
-                                <td>
-                                    <span class="badge
-                                        @if($document->status == 'Approved') badge-success
-                                        @elseif($document->status == 'Rejected') badge-danger
-                                        @elseif($document->status == 'In Progress' || $document->status == 'In Progrress') badge-info
-                                        @elseif($document->status == 'Need Approval') badge-warning
-                                        @else badge-secondary
-                                        @endif">
-                                        {{ $document->status }}
-                                    </span>
-                                </td>
-                                <td>{{ $document->folder?->full_path ?? '-' }}</td>
-                                <td>{{ $document->created_at->format('d M Y, H:i') }}</td>
-                                <td>{{ $document->updated_at->format('d M Y, H:i') }}</td>
-                                <td>
-                                    {{ $document->requester?->name ?? '-' }} 
-                                    ({{ $document->requester?->username ?? '-' }})
-                                </td>
-                                <td class="text-center">
-                                    <a href="{{ route('inbox.preview', $document->id) }}" class="btn btn-sm btn-light" title="View">
-                                        <i class="fas fa-eye text-secondary"></i>
-                                    </a>
-                                    <a href="{{ route('inbox.download', $document->id) }}" 
-                                        class="btn btn-sm btn-light" 
-                                        title="Download"
-                                        download>
-                                            <i class="fas fa-download text-success"></i>
-                                        </a>
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-light btn-share-document"
-                                        data-document-id="{{ $document->id }}"
-                                        title="Share">
-                                        <i class="fas fa-share-alt text-info"></i>
-                                    </button>
-                                    <button type="button"
-                                            class="btn btn-sm btn-light btn-move-folder"
-                                            data-document-id="{{ $document->id }}">
-                                        <i class="fas fa-folder-open text-warning"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
-                                    <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
-                                    No documents in this folder.
-                                </td>
-                            </tr>
-                            @endforelse
-                        </tbody>
+                    <tbody>
+    @forelse($documents as $document)
+    <tr>
+        <td><input type="checkbox" class="rowCheckbox" value="{{ $document->id }}"></td>
+        <td>
+            <strong>{{ $document->document_name }}</strong>
+        </td>
+        <td>
+            <span class="badge
+                @if($document->status == 'Approved') badge-success
+                @elseif($document->status == 'Rejected') badge-danger
+                @elseif($document->status == 'In Progress' || $document->status == 'In Progrress') badge-info
+                @elseif($document->status == 'Need Approval') badge-warning
+                @else badge-secondary
+                @endif">
+                {{ $document->status }}
+            </span>
+        </td>
+        <td>{{ $document->folder?->full_path ?? '-' }}</td>
+        <td>{{ $document->created_at->format('d M Y, H:i') }}</td>
+        <td>{{ $document->updated_at->format('d M Y, H:i') }}</td>
+        <td>
+            {{ $document->requester?->name ?? '-' }} 
+            ({{ $document->requester?->username ?? '-' }})
+        </td>
+        <td>
+            @php
+                $addressees = $document->documentApprovals
+                    ->where('is_requester', false)
+                    ->map(fn($approval) => $approval->approver?->name)
+                    ->filter()
+                    ->unique()
+                    ->values();
+            @endphp
+
+            @if($addressees->isNotEmpty())
+                {{ $addressees->implode(', ') }}
+            @else
+                -
+            @endif
+        </td>
+        <td class="text-center">
+            <a href="{{ route('inbox.preview', $document->id) }}" class="btn btn-sm btn-light" title="View">
+                <i class="fas fa-eye text-secondary"></i>
+            </a>
+            
+            <a href="{{ route('inbox.download', $document->id) }}" 
+               class="btn btn-sm btn-light" 
+               title="Download"
+               download>
+                <i class="fas fa-download text-success"></i>
+            </a>
+
+            {{-- Tombol share hanya tampil jika status Approved --}}
+            @if($document->status == 'Approved')
+            <button
+                type="button"
+                class="btn btn-sm btn-light btn-share-document"
+                data-document-id="{{ $document->id }}"
+                title="Share">
+                <i class="fas fa-share-alt text-info"></i>
+            </button>
+            @endif
+
+            <button type="button"
+                    class="btn btn-sm btn-light btn-move-folder"
+                    data-document-id="{{ $document->id }}">
+                <i class="fas fa-folder-open text-warning"></i>
+            </button>
+        </td>
+    </tr>
+    @empty
+    <tr>
+        <td colspan="9" class="text-center py-5 text-muted">
+            <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+            No documents in this folder.
+        </td>
+    </tr>
+    @endforelse
+</tbody>
                     </table>
                 </div>
                 
@@ -357,6 +494,10 @@
 </div>
 
 <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
+@push('scripts')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
 // Bulk Action Script
 const selectAll = document.getElementById('selectAll');
@@ -365,34 +506,13 @@ const bulkExportBtn = document.getElementById('bulkExportBtn');
 const bulkApproveBtn = document.getElementById('bulkApproveBtn');
 
 let searchTimer;
-$('#searchInput').on('keyup', function () {
-    clearTimeout(searchTimer);
 
-    let value = $(this).val().trim();
-
-    searchTimer = setTimeout(function () {
-        let url = new URL(window.location.href);
-
-        if (value) {
-            url.searchParams.set('search', value);
-        } else {
-            url.searchParams.delete('search');
-        }
-
-        // Preserve other parameters (perPage, status, requester_id, dll)
-        const paramsToKeep = ['status', 'requester_id', 'from_date', 'to_date', 'perPage'];
-        paramsToKeep.forEach(param => {
-            let val = url.searchParams.get(param);
-            if (!val) {
-                const currentVal = new URLSearchParams(window.location.search).get(param);
-                if (currentVal) url.searchParams.set(param, currentVal);
-            }
-        });
-
-        window.location.href = url.toString();
-    }, 450); // delay 450ms
-});
-
+$('#requesterSelect, #addresseeSelect').select2({
+        theme: 'bootstrap4',
+        placeholder: 'Search...',
+        allowClear: true,
+        width: '100%'
+    });
 $(document).ready(function () {
 
     $('.btn-move-folder').on('click', function (e) {
@@ -497,14 +617,54 @@ checkboxes.forEach(cb => {
     cb.addEventListener('change', toggleButtons);
 });
 // ==================== BULK APPROVE HANDLER ====================
+// ==================== BULK APPROVE HANDLER ====================
 bulkApproveBtn?.addEventListener('click', async function () {
     const checkedBoxes = document.querySelectorAll('.rowCheckbox:checked');
-    const documentIds = Array.from(checkedBoxes).map(cb => cb.value);
+    if (checkedBoxes.length === 0) return;
 
-    if (documentIds.length === 0) return;
+    let invalidStatusList = [];
+    const documentIds = [];
 
+    // Filter status di sisi client sebelum mengirim request
+    checkedBoxes.forEach(cb => {
+        const row = cb.closest('tr');
+        const docName = row.querySelector('td:nth-child(2)').innerText.trim();
+        const statusBadge = row.querySelector('td:nth-child(3) .badge').innerText.trim();
+
+        if (statusBadge === 'Approved' || statusBadge === 'Rejected') {
+            invalidStatusList.push(`<li><b>${docName}</b> (Status: ${statusBadge})</li>`);
+        } else {
+            documentIds.push(cb.value);
+        }
+    });
+
+    // Jika ada dokumen yang statusnya sudah Approved atau Rejected
+    if (invalidStatusList.length > 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Bulk Approve Failed',
+            html: `
+                <div class="text-left">
+                    <p class="text-danger font-weight-bold mb-2">
+                        Cannot process approval for documents with the following status:
+                    </p>
+                    <ul class="text-muted small pl-3 mb-3">
+                        ${invalidStatusList.join('')}
+                    </ul>
+                    <small class="text-muted">
+                        Only documents with status <b>Need Approval</b> or <b>In Progress</b> can be approved.
+                    </small>
+                </div>
+            `,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Understand'
+        });
+        return; // Hentikan eksekusi, tidak ada AJAX call yang dikirim
+    }
+
+    // Konfirmasi Konfirmasi Approval
     const confirmResult = await Swal.fire({
-       title: 'Are you sure?',
+        title: 'Are you sure?',
         html: `You are about to approve <strong>${documentIds.length}</strong> document(s).<br><br>
                <small class="text-muted">I have opened and reviewed all selected documents.<br>
                If any document has not been opened yet, the entire bulk approve will be cancelled.</small>`,
@@ -516,9 +676,7 @@ bulkApproveBtn?.addEventListener('click', async function () {
         cancelButtonText: 'Cancel'
     });
 
-    if (!confirmResult.isConfirmed) {
-        return;
-    }
+    if (!confirmResult.isConfirmed) return;
 
     const originalText = this.innerHTML;
     this.disabled = true;
@@ -545,12 +703,27 @@ bulkApproveBtn?.addEventListener('click', async function () {
                 showConfirmButton: false
             }).then(() => location.reload());
         } else {
+            // Penanganan error detail jika diprotes backend
+            let errorMessage = result.error || result.message || 'Operation failed.';
+            
+            // Format daftar error khusus jika mengembalikan invalid_documents dari Controller
+            let formattedInvalidDocs = '';
+            if (result.invalid_documents && result.invalid_documents.length > 0) {
+                formattedInvalidDocs = `
+                    <div class="text-left mt-3">
+                        <p class="text-danger mb-1 font-weight-bold small">Reason for failure:</p>
+                        <ul class="small text-muted pl-3 mb-0">
+                            ${result.invalid_documents.map(doc => `<li>${doc}</li>`).join('')}
+                        </ul>
+                    </div>`;
+            }
+
             Swal.fire({
                 icon: 'error',
                 title: 'Bulk Approve Failed',
-                html: result.error || result.message,
-                footer: result.invalid_documents ? 
-                    '<small>Invalid documents:<br>' + result.invalid_documents.join('<br>') + '</small>' : ''
+                html: `<div>${errorMessage}</div>${formattedInvalidDocs}`,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Close'
             });
         }
     } catch (error) {
@@ -653,4 +826,5 @@ $('#folderSearchInput').on('keyup', function () {
     }, 500);
 });
 </script>
+@endpush
 @endsection

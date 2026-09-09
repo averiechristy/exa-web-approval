@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Inbox')
+@section('title', 'Sent')
 
 <style>
     .hover-shadow {
@@ -9,13 +9,111 @@
         transform: translateY(-3px);
         box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
     }
+
+    .select2-container {
+        width: 100% !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--single {
+        height: 31px !important;
+        min-height: 31px !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 0.25rem !important;
+        background: #fff !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        overflow: hidden !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        display: flex !important;
+        align-items: center !important;
+        line-height: 1.2 !important;
+        padding: 0 36px 0 12px !important;
+        color: #111827 !important;
+        font-size: 0.875rem !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__placeholder {
+        color: #6b7280 !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow {
+        height: 100% !important;
+        width: 28px !important;
+        right: 2px !important;
+        background: transparent !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection__clear {
+        color: #111827 !important;
+        font-size: 18px !important;
+        right: 28px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        margin: 0 !important;
+        line-height: 1 !important;
+    }
+
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow b {
+        border-color: #111827 transparent transparent transparent !important;
+        border-width: 6px 5px 0 5px !important;
+        margin-left: -4px !important;
+        margin-top: -2px !important;
+    }
+
+    .select2-container--bootstrap4.select2-container--focus .select2-selection--single {
+        border-color: #111827 !important;
+        box-shadow: none !important;
+    }
+
+    .select2-container--bootstrap4 .select2-dropdown {
+        border: 2px solid #1f1f1f !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .select2-container--bootstrap4 .select2-results__option {
+        padding: 10px 12px !important;
+        font-size: 0.95rem !important;
+        color: #111827 !important;
+        background: #fff !important;
+    }
+
+    .select2-container--bootstrap4 .select2-results__option--highlighted {
+        background-color: #f3f4f6 !important;
+        color: #111827 !important;
+    }
+
+    .select2-container--bootstrap4 .select2-search__field {
+        border: 1px solid #d1d5db !important;
+        border-radius: 0 !important;
+        padding: 10px 12px !important;
+        outline: none !important;
+    }
 </style>
 
 @section('content')
 <div class="container-fluid">
     <h1 class="h3 mb-4 text-gray-800">Sent</h1>
 
+    @if(session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
     @if(session('error'))
+        <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
+
+    <!-- @if(session('error'))
     <div class="alert alert-danger">
         {{ session('error') }}
     </div>
@@ -25,7 +123,7 @@
         <div class="alert alert-success">
             {{ session('success') }}
         </div>
-    @endif
+    @endif -->
 
     {{-- Documents Section - Hanya tampil jika sedang di dalam folder --}}
  
@@ -40,25 +138,19 @@
                 </button>
             </div>
 
-            <!-- Search Input -->
-            <input 
-                type="text" 
-                id="searchInput"
-                name="search"
-                class="form-control"
-                placeholder="Search document name..."
-                value="{{ request('search') }}"
-                style="width: 280px;"
-            >
         </div>
     <!-- Filter -->
         <div class="card shadow-sm mb-4">
             <div class="card-body">
                 <form method="GET" action="{{ route('sent.index') }}">
                     <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label class="small font-weight-bold">Document Name</label>
+                            <input type="text" id="searchInput" name="search" class="form-control form-control-sm" placeholder="Search document name..." value="{{ request('search') }}">
+                        </div>
                         <div class="col-md-2">
                             <label class="small font-weight-bold">Status</label>
-                            <select class="form-control" name="status">
+                            <select class="form-control form-control-sm" name="status">
                                 <option value="">All Status</option>
                                 <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
                                 <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
@@ -66,21 +158,42 @@
                                 <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
                             </select>
                         </div>
+                        <div class="col-md-3">
+                            <label class="small font-weight-bold">Requester</label>
+                            <select class="form-control form-control-sm select2" id="requesterSelect" name="requester_id">
+                                <option value="">All Requesters</option>
+                                @foreach($userOptions as $user)
+                                    <option value="{{ $user->id }}" {{ request('requester_id') == $user->id ? 'selected' : '' }}>
+                                        {{ $user->name }} ({{ $user->username }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="small font-weight-bold">Addressee</label>
+                            <select class="form-control form-control-sm select2" id="addresseeSelect" name="addressee_id">
+                                <option value="">All Addressees</option>
+                                @foreach($addresseeOptions as $user)
+                                    <option value="{{ $user->id }}" {{ request('addressee_id') == $user->id ? 'selected' : '' }}>
+                                        {{ $user->name }} ({{ $user->username }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="col-md-2">
                             <label class="small font-weight-bold">From</label>
-                            <input type="date" class="form-control" name="from_date" value="{{ request('from_date') }}">
+                            <input type="date" class="form-control form-control-sm" name="from_date" value="{{ request('from_date') }}">
                         </div>
                         <div class="col-md-2">
                             <label class="small font-weight-bold">To</label>
-                            <input type="date" class="form-control" name="to_date" value="{{ request('to_date') }}">
+                            <input type="date" class="form-control form-control-sm" name="to_date" value="{{ request('to_date') }}">
                         </div>
-                        <div class="col-md-3">
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-primary" type="submit" style="margin-right: 10px;">
+                        <div class="col-12 text-right mt-3">
+                            <div class="d-flex">
+                                <button class="btn btn-primary btn-sm mr-1" type="submit">
                                     <i class="fas fa-filter"></i> Apply Filter
                                 </button>
-                                <a href="{{ route('sent.index') }}" 
-                                class="btn btn-secondary flex-fill">
+                                <a href="{{ route('sent.index') }}" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-undo"></i> Reset
                                 </a>
                             </div>
@@ -104,6 +217,7 @@
                                 <th>Created Time</th>
                                 <th>Last Modified</th>
                                 <th>Requester</th>
+                                <th>Addressee</th>
                                 <th width="180">Action</th>
                             </tr>
                         </thead>
@@ -132,6 +246,22 @@
                                     {{ $document->requester?->name ?? '-' }} 
                                     ({{ $document->requester?->username ?? '-' }})
                                 </td>
+                                <td>
+                                    @php
+                                        $addressees = $document->documentApprovals
+                                            ->where('is_requester', false)
+                                            ->map(fn($approval) => $approval->approver?->name)
+                                            ->filter()
+                                            ->unique()
+                                            ->values();
+                                    @endphp
+
+                                    @if($addressees->isNotEmpty())
+                                        {{ $addressees->implode(', ') }}
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                                 <td class="text-center">
                                     <a href="{{ route('sent.preview', $document->id) }}" class="btn btn-sm btn-light" title="View">
                                         <i class="fas fa-eye text-secondary"></i>
@@ -142,13 +272,27 @@
                                         download>
                                             <i class="fas fa-download text-success"></i>
                                         </a>
-<button
-    type="button"
-    class="btn btn-sm btn-light btn-share-document"
-    data-document-id="{{ $document->id }}"
-    title="Share">
-    <i class="fas fa-share-alt text-info"></i>
-</button>
+                                    @if($document->status == 'Need Approval' && $document->documentApprovals
+                                        ->where('is_requester', false)
+                                        ->isNotEmpty() && $document->documentApprovals
+                                        ->where('is_requester', false)
+                                        ->every(fn ($approval) => $approval->status == 'Pending' && ! $approval->flag_open))
+                                        <form method="POST" action="{{ route('sent.cancel', $document->id) }}" class="d-inline cancel-document-form">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-light" title="Withdraw" data-document-name="{{ $document->document_name }}">
+                                                <i class="fas fa-ban text-danger"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+ @if($document->status == 'Approved')
+            <button
+                type="button"
+                class="btn btn-sm btn-light btn-share-document"
+                data-document-id="{{ $document->id }}"
+                title="Share">
+                <i class="fas fa-share-alt text-info"></i>
+            </button>
+            @endif
                                     <button type="button"
                                             class="btn btn-sm btn-light btn-move-folder"
                                             data-document-id="{{ $document->id }}">
@@ -158,7 +302,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
+                                <td colspan="9" class="text-center py-5 text-muted">
                                     <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                     No documents in this folder.
                                 </td>
@@ -352,7 +496,16 @@
 </div>
 
 <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+$('#requesterSelect, #addresseeSelect').select2({
+    theme: 'bootstrap4',
+    placeholder: 'Search...',
+    allowClear: true,
+    width: '100%'
+});
+
 // Bulk Action Script
 const selectAll = document.getElementById('selectAll');
 const checkboxes = document.querySelectorAll('.rowCheckbox');
@@ -389,6 +542,26 @@ $('#searchInput').on('keyup', function () {
 });
 
 $(document).ready(function () {
+
+    $('.cancel-document-form').on('submit', async function (e) {
+        e.preventDefault();
+
+        const form = this;
+        const documentName = $(form).find('button').data('document-name');
+        const result = await Swal.fire({
+            title: 'Withdraw document?',
+            text: `"${documentName}" will no longer be available for approval.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, withdraw it'
+        });
+
+        if (result.isConfirmed) {
+            form.submit();
+        }
+    });
 
     $('.btn-move-folder').on('click', function (e) {
         e.preventDefault();

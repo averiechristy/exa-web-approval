@@ -147,7 +147,7 @@
                                 id="divisionName"
                                 class="form-control @error('name') is-invalid @enderror"
                                 value="{{ old('name') }}"
-                                oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')"
+                                oninput="this.value = this.value.replace(/[^A-Za-z\s\-\/\&]/g, '')"
                             >
                             <small class="text-danger" id="error-name">
                                 @error('name')
@@ -191,7 +191,7 @@
                             name="division_name"
                             id="editName"
                             class="form-control"
-                            oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')"
+                            oninput="this.value = this.value.replace(/[^A-Za-z\s\-\/\&]/g, '')"
                         >
                         <small class="text-danger" id="edit-error-name"></small>
                     </div>

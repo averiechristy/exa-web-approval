@@ -94,7 +94,7 @@
         <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Approved Today</div>
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Approved</div>
                     <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['approved_today'] }}</div>
                 </div>
             </div>

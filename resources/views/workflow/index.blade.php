@@ -353,7 +353,7 @@
 @push('scripts')
 <script>
 let originalEditData = null;
-$(document).ready(function () {
+$(document).ready(function () { 
     $('#clearWorkflow').on('click', function () {
         resetWorkflowForm();
     });
@@ -389,88 +389,107 @@ $(document).on("click", ".removeWorkflow", function () {
     // =====================
     // SAVE WORKFLOW VALIDATION
     // =====================
-    $('#workflowForm').on('submit', function (e) {
-        e.preventDefault();
+// =====================
+// SAVE WORKFLOW VALIDATION (STRICT / ALL MANDATORY)
+// =====================
+$('#workflowForm').on('submit', function (e) {
+    e.preventDefault();
 
-        let isValid = true;
+    let isValid = true;
 
-        let documentType = $('#documentType').val().trim();
-        let errorDoc = $('#error-document-type');
-        let errorDivision = $('#error-division');
+    // Reset error messages & states
+    $('#error-document-type, #error-organization, #error-division').text('');
+    $('.form-control').removeClass('is-invalid');
 
-        errorDoc.text('');
-        errorDivision.text('');
+    // 1. Validasi Document Type
+    let documentType = $('#documentType').val().trim();
+    if (!documentType) {
+        $('#error-document-type').text('Document Type is required.');
+        $('#documentType').addClass('is-invalid');
+        isValid = false;
+    }
 
-        $('#documentType').removeClass('is-invalid');
-        $('.division-select').removeClass('is-invalid');
+    // 2. Validasi Organization
+    let organization = $('#organizationId').val();
+    if (!organization) {
+        $('#error-organization').text('Organization is required.');
+        $('#organizationId').addClass('is-invalid');
+        isValid = false;
+    }
 
-        let organization = $('#organizationId').val();
-        let errorOrg = $('#error-organization');
+    // 3. Validasi Setiap Row Step (Division, SLA, Min Role)
+    let divisions = [];
+    let rows = $('#workflowContainer .workflow-row');
 
-        errorOrg.text('');
-        $('#organizationId').removeClass('is-invalid');
+    if (rows.length === 0) {
+        $('#error-division').text('At least 1 workflow step is required.');
+        isValid = false;
+    }
 
-        if (!organization) {
-            errorOrg.text('Organization is required');
-            $('#organizationId').addClass('is-invalid');
+    rows.each(function (index) {
+        let divisionSelect = $(this).find('.division-select');
+        let slaInput = $(this).find('.slaInput');
+        let roleSelect = $(this).find('.role-select');
+
+        let divisionVal = divisionSelect.val();
+        let slaVal = slaInput.val().trim();
+        let roleVal = roleSelect.val();
+
+        // Validasi Division
+        if (!divisionVal) {
+            divisionSelect.addClass('is-invalid');
+            isValid = false;
+        } else {
+            divisions.push(divisionVal);
+        }
+
+        // Validasi SLA Days (harus diisi dan lebih dari 0)
+        if (!slaVal || parseInt(slaVal) <= 0) {
+            slaInput.addClass('is-invalid');
             isValid = false;
         }
 
-        // VALIDASI DOCUMENT TYPE
-        if (documentType.length < 1) {
-            errorDoc.text('Document Type is required');
-            $('#documentType').addClass('is-invalid');
+        // Validasi Min Role Level
+        if (!roleVal) {
+            roleSelect.addClass('is-invalid');
             isValid = false;
         }
+    });
 
-        // VALIDASI DIVISION
-        let divisions = [];
-        let hasDivision = false;
+    if (!isValid) {
+        $('#error-division').text('All fields in each workflow step are mandatory.');
+    }
 
-        $('.workflow-row').each(function () {
-            let division = $(this).find('.division-select').val();
-            if (division) {
-                hasDivision = true;
-                divisions.push(division);
-            }
-        });
-
-        if (!hasDivision) {
-            errorDivision.text('At least 1 approval division is required');
-            isValid = false;
-        }
-
-        // DUPLICATE CHECK
-        let duplicate = divisions.some((item, index) => divisions.indexOf(item) !== index);
-
-        if (duplicate) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Duplicate Division',
-                text: 'Each tier must have different division'
-            });
-            return;
-        }
-
-        if (!isValid) return;
-
+    // 4. Check Duplicate Division
+    let hasDuplicate = divisions.some((item, idx) => divisions.indexOf(item) !== idx);
+    if (hasDuplicate) {
         Swal.fire({
-            title: 'Are you sure add this data?',
-            icon: 'warning',
-            showCancelButton: true,
-            reverseButtons: true,
-            confirmButtonColor: '#4e73df',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'Cancel'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                this.submit();
-            }
+            icon: 'error',
+            title: 'Duplicate Division',
+            text: 'Each tier must have a different division.'
         });
+        return;
+    }
 
+    // Jika ada input yang kosong/invalid, hentikan submit
+    if (!isValid) return;
+
+    // SweetAlert Confirm
+    Swal.fire({
+        title: 'Are you sure add this data?',
+        icon: 'warning',
+        showCancelButton: true,
+        reverseButtons: true,
+        confirmButtonColor: '#4e73df',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            this.submit();
+        }
+    });
 });
-
 $(document).on('click', '.edit-btn', function () {
 
     let id = $(this).data('id');

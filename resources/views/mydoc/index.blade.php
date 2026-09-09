@@ -43,7 +43,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item">
-                        <a href="{{ route('mydoc.index') }}">Inbox</a>
+                        <a href="{{ route('mydoc.index') }}">My Document</a>
                     </li>
                     
                     @if(isset($folder) && $breadcrumb)

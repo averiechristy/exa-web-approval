@@ -16,67 +16,68 @@ class SharedController extends Controller
     /**
      * Display a listing of the resource.
      */
-public function index()
-{
-    $user = auth()->user();
+    public function index()
+    {
+        $user = auth()->user();
 
-    $organizationId = session('active_organization_id')
-        ?? $user->current_organization_id
-        ?? 1;
+        $organizationId = session('active_organization_id')
+            ?? $user->current_organization_id
+            ?? 1;
 
-    $status = request('status');
-    $requester_id = request('requester_id');
-    $from_date = request('from_date');
-    $to_date = request('to_date');
-    $search = request('search');
-    $perPage = request('perPage', 10);
+        $status = request('status');
+        $requester_id = request('requester_id');
+        $from_date = request('from_date');
+        $to_date = request('to_date');
+        $search = request('search');
+        $perPage = request('perPage', 10);
 
-    $sharedDocumentIds = DocumentShare::where('share_to', $user->id)
-        ->pluck('document_id');
+        $sharedDocumentIds = DocumentShare::where('share_to', $user->id)
+            ->pluck('document_id');
 
-    $query = Documents::with(['requester'])
-        ->where('organization_id', $organizationId)
-        ->whereIn('id', $sharedDocumentIds);
+        $query = Documents::with(['requester'])
+            ->where('organization_id', $organizationId)
+            ->whereIn('id', $sharedDocumentIds)
+            ->where('status', 'Approved');
 
-    if (!empty($search)) {
-        $query->whereRaw(
-            'LOWER(document_name) LIKE ?',
-            ['%' . strtolower($search) . '%']
-        );
+        if (!empty($search)) {
+            $query->whereRaw(
+                'LOWER(document_name) LIKE ?',
+                ['%' . strtolower($search) . '%']
+            );
+        }
+
+        if (!empty($status)) {
+            $query->where('status', $status);
+        }
+
+        if (!empty($requester_id)) {
+            $query->where('requester_id', $requester_id);
+        }
+
+        if (!empty($from_date)) {
+            $query->whereDate('created_at', '>=', $from_date);
+        }
+
+        if (!empty($to_date)) {
+            $query->whereDate('created_at', '<=', $to_date);
+        }
+
+        $documents = $query
+            ->orderBy('updated_at', 'desc')
+            ->paginate($perPage)
+            ->appends(request()->query());
+
+        $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId) {
+                $q->where('organization_id', $organizationId);
+            })
+            ->orderBy('name')
+            ->get();
+
+        return view('shared.index', compact(
+            'documents',
+            'userOptions'
+        ));
     }
-
-    if (!empty($status)) {
-        $query->where('status', $status);
-    }
-
-    if (!empty($requester_id)) {
-        $query->where('requester_id', $requester_id);
-    }
-
-    if (!empty($from_date)) {
-        $query->whereDate('created_at', '>=', $from_date);
-    }
-
-    if (!empty($to_date)) {
-        $query->whereDate('created_at', '<=', $to_date);
-    }
-
-    $documents = $query
-        ->orderBy('updated_at', 'desc')
-        ->paginate($perPage)
-        ->appends(request()->query());
-
-    $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId) {
-            $q->where('organization_id', $organizationId);
-        })
-        ->orderBy('name')
-        ->get();
-
-    return view('shared.index', compact(
-        'documents',
-        'userOptions'
-    ));
-}
 
     public function preview($id)
     {

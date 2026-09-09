@@ -338,7 +338,7 @@ public function getWorkflowApprovers($workflowId, Request $request)
 
                     $approvalIdsMap[$app['temp_id']] = $docApproval->id;
 
-                    if ($app['approver_order'] == 2) {
+                    if ($app['approver_order'] == 1 && $app['is_requester'] !== true) {
                         $approverUser = User::find($app['approver_id']);
                         if ($approverUser && $approverUser->email) {
                             try {
@@ -348,7 +348,7 @@ public function getWorkflowApprovers($workflowId, Request $request)
                                 \Log::warning("Gagal mengirim email approval ke {$approverUser->email}: " . $mailEx->getMessage());
                             }
                         }
-}
+                    }
                 }
 
                 // ================= AUTO APPLY REQUESTER SIGNATURE KE PDF =================
@@ -483,7 +483,8 @@ public function getWorkflowApprovers($workflowId, Request $request)
         $pageCount = $pdf->setSourceFile($originalPath);
 
         $approver = User::find($requesterApproval['approver_id']);
-        $approvalTime = now()->format('d M Y H:i');
+        $approvalTime = now()->format('d F Y H:i');
+        $formattedDate = date('d F Y H:i', strtotime($approvalTime));
 
         $approvalStartY = null;
 
@@ -549,12 +550,13 @@ public function getWorkflowApprovers($workflowId, Request $request)
 
             // Requested By
             $pdf->SetFont('helvetica', 'B', 12);
-            $pdf->Cell(0, 10, 'Requested by : ' . $approver->name, 0, 1);
-            $pdf->SetFont('helvetica', '', 11);
-            $pdf->Cell(0, 8, 'Date : ' . $approvalTime, 0, 1);
+            $pdf->Cell(0, 10, 'Requested by :', 0, 1);
+
+            // Menampilkan format: Nama at Tanggal BulanPanjang Tahun Jam:Menit
+            $pdf->Cell(0, 8, $approver->name . ' at ' . $formattedDate, 0, 1);
             $pdf->Ln(15);
 
-            // Approved By - Tempat tanda tangan berikutnya
+            // Approved By - Tempat tanda tangan beriku  tnya
             $pdf->SetFont('helvetica', 'B', 12);
             $pdf->Cell(0, 10, 'Approved by :', 0, 1);
             $pdf->SetFont('helvetica', '', 11);

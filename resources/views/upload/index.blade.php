@@ -201,7 +201,7 @@
                         <!-- Diisi JS -->
                     </div>
                     <small class="text-muted">
-                        <i class="fas fa-info-circle mr-1"></i> Drag approver ke canvas PDF
+                        <i class="fas fa-info-circle mr-1"></i> Drag & put approver to the document
                     </small>
                 </div>
 
@@ -644,36 +644,46 @@ function renderSignerListFromStep2() {
                 }
 
                 // Form validation
-                let orgId, divId;
-                if (@json($isSuperAdmin)) {
-                    orgId = $('#organizationSelect').val();
-                    divId = $('#divisionSelect').val();
-                } else {
-                    orgId = $('#organizationSelectHidden').val();
-                    divId = $('#divisionSelectHidden').val();
-                }
+               let orgId, divId;
+const isSuperAdmin = @json($isSuperAdmin);
 
-                let folder = $('#folderSelect').val();
-                let docType = $('#documentTypeSelect').val();
+if (isSuperAdmin) {
+    orgId = $('#organizationSelect').val();
+    divId = $('#divisionSelect').val();
+} else {
+    orgId = $('#organizationSelectHidden').val();
+    divId = $('#divisionSelectHidden').val();
+}
 
-                if (!orgId || !folder || !docType) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Incomplete Form',
-                        html: `
-                            <div class="text-left">
-                                <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
-                                <strong>Required fields:</strong><br>
-                                - Organization<br>
-                                - Division<br>
-                                - Document Type<br>
-                                - Folder
-                            </div>
-                        `,
-                        confirmButtonText: 'OK'
-                    });
-                    return;
-                }
+let folder = $('#folderSelect').val();
+let docType = $('#documentTypeSelect').val();
+
+// Kumpulkan daftar field yang benar-benar belum diisi
+const missingFields = [];
+
+if (isSuperAdmin) {
+    if (!orgId) missingFields.push('Organization');
+    if (!divId) missingFields.push('Division');
+}
+if (!docType) missingFields.push('Document Type');
+if (!folder) missingFields.push('Folder');
+
+// Jika ada yang belum diisi
+if (missingFields.length > 0) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'Incomplete Form',
+        html: `
+            <div class="text-left">
+                <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+                <strong>Required fields:</strong><br>
+                ${missingFields.map(field => `- ${field}`).join('<br>')}
+            </div>
+        `,
+        confirmButtonText: 'OK'
+    });
+    return;
+}
 
                 // Save Step 1 data
                 step1Data = collectStep1Data();

@@ -16,7 +16,7 @@ class MyDocumentController extends Controller
     /**
      * Display a listing of the resource.
      */
-public function index()
+    public function index()
     {
         $user = auth()->user();
         $organizationId = session('active_organization_id') ?? $user->current_organization_id ?? 1;
@@ -36,7 +36,6 @@ public function index()
         $folders = $foldersQuery->paginate(10)
                             ->appends(request()->query());
 
-        // Documents tetap kosong (seperti sebelumnya)
         $documents = new LengthAwarePaginator(
             collect(), 0, 15, 1, [
                 'path'  => request()->url(),

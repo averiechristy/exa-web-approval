@@ -54,7 +54,7 @@
                     <tbody>
                         @forelse($activities as $activity)
                             <tr>
-                                <td class="small">{{ $activity->created_at->format('d M Y H:i:s') }}</td>
+                                <td class="small">{{ $activity->created_at->format('d F Y H:i:s') }}</td>
                                 <td><strong>{{ $activity->causer->name ?? 'System Automated' }}</strong></td>
                                 <td><span class="badge badge-secondary px-2 py-1">{{ $activity->log_name }}</span></td>
                                 <td><code class="text-primary font-weight-bold">{{ $activity->event }}</code></td>

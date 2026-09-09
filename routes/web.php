@@ -93,6 +93,7 @@ Route::middleware('auth')->group(function () {
 
     //Sent
     Route::get('/sent', [SentController::class, 'index'])->name('sent.index')->middleware('user');
+    Route::post('/sent/documents/{document}/cancel', [SentController::class, 'cancel'])->name('sent.cancel')->middleware('user');
         Route::get('/sent/documents/{document}/download', [SentController::class, 'download'])->name('sent.download')->middleware('user');
     Route::post('/sent/bulk-export', [SentController::class, 'bulkExport'])->name('sent.bulkExport')->middleware('user');
         Route::get('/sent/documents/{document}/preview', [SentController::class, 'preview'])->name('sent.preview')->middleware('user');

@@ -21,14 +21,18 @@ class SentController extends Controller
             ?? $user->current_organization_id
             ?? 1;
 
-    $documents = Documents::with(['requester'])
-        ->where('organization_id', $organizationId)
-        ->where('requester_id', $user->id);
+    $documents = Documents::with([
+            'requester',
+            'documentApprovals.approver',
+            'folder.parent'
+        ])
+        ->where('organization_id', $organizationId);
 
         // ================= FILTER =================
 
         $status = request('status');
-        // $requester_id = request('requester_id');
+        $requester_id = request('requester_id');
+        $addressee_id = request('addressee_id');
         $from_date = request('from_date');
         $to_date = request('to_date');
         $search = request('search');
@@ -45,9 +49,18 @@ class SentController extends Controller
             $documents->where('status', $status);
         }
 
-        // if ($requester_id) {
-        //     $documents->where('requester_id', $requester_id);
-        // }
+        if ($requester_id) {
+            $documents->where('requester_id', $requester_id);
+        } else {
+            $documents->where('requester_id', $user->id);
+        }
+
+        if ($addressee_id) {
+            $documents->whereHas('documentApprovals', function ($q) use ($addressee_id) {
+                $q->where('approver_id', $addressee_id)
+                    ->where('is_requester', false);
+            });
+        }
 
         if ($from_date) {
             $documents->whereDate('created_at', '>=', $from_date);
@@ -71,7 +84,7 @@ class SentController extends Controller
 
         $folderOptions = $this->buildFolderOptions($rootFolders);
 
-        // ================= REQUESTER FILTER =================
+        // ================= USER / ADDRESSEE FILTER =================
 
         $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId) {
                 $q->where('organization_id', $organizationId);
@@ -79,10 +92,21 @@ class SentController extends Controller
             ->orderBy('name')
             ->get();
 
+        $addresseeOptions = User::whereHas('documentapproval', function ($q) use ($organizationId, $user) {
+                $q->where('is_requester', false)
+                    ->whereHas('document', function ($documentQuery) use ($organizationId, $user) {
+                        $documentQuery->where('organization_id', $organizationId)
+                            ->where('requester_id', $user->id);
+                    });
+            })
+            ->orderBy('name')
+            ->get();
+
         return view('sent.index', compact(
             'documents',
             'folderOptions',
-            'userOptions'
+            'userOptions',
+            'addresseeOptions'
         ));
     }
 
@@ -146,6 +170,39 @@ class SentController extends Controller
         }
 
         return Storage::disk('public')->download($filePath, $fileName);
+    }
+
+    public function cancel($id)
+    {
+        $user = auth()->user();
+        $organizationId = session('active_organization_id')
+            ?? $user->current_organization_id
+            ?? 1;
+
+        $document = Documents::with('documentApprovals')
+            ->where('organization_id', $organizationId)
+            ->where('requester_id', $user->id)
+            ->findOrFail($id);
+
+        $recipientApprovals = $document->documentApprovals
+            ->where('is_requester', false);
+
+        $canCancel = $recipientApprovals->isNotEmpty()
+            && $document->status === 'Need Approval'
+            && $recipientApprovals->every(fn ($approval) => $approval->status === 'Pending')
+            && $recipientApprovals->every(fn ($approval) => ! $approval->flag_open);
+
+        if (! $canCancel) {
+            return redirect()
+                ->back()
+                ->with('error', 'Document can no longer be withdrawn because the approval process has started.');
+        }
+
+        $document->update(['status' => 'Cancelled']);
+
+        return redirect()
+            ->back()
+            ->with('success', 'Document withdrawal successful.');
     }
 
         public function bulkExport(Request $request)

@@ -17,22 +17,8 @@
 
     <p>Dear Sir/Madam,</p>
 
-    @if(!empty($customMessage))
-        {!! nl2br($customMessage) !!}
-    @else
-        <p>This is to inform you that a document is currently awaiting your approval.</p>
-
-        <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
-            <tr>
-                <td style="padding: 8px 0; font-weight: bold; width: 140px;">Document Name</td>
-                <td style="padding: 8px 0;">: {{ $docName }}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Approval Level</td>
-                <td style="padding: 8px 0;">: Tier {{ $approval->tier ?? $order }}</td>
-            </tr>
-        </table>
-    @endif
+    <!-- Content / Isi Pesan -->
+    <p>{!! nl2br(e($customMessage)) !!}</p>
 
     <p>Please log in to the system to review the document and take the necessary action.</p>
 

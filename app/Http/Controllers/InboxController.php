@@ -103,18 +103,22 @@ class InboxController extends Controller
 
         $documents = Documents::with([
                 'requester',
-                'folder.parent'
+                'folder.parent',
+                'documentApprovals.approver'
             ])
             ->where('organization_id', $organizationId)
+            ->where('status', '!=', 'Cancelled')
             ->where(function ($q) use ($user) {
 
             $q->whereHas('documentapprovals', function ($sub) use ($user) {
                 $sub->where('approver_id', $user->id)
+                ->where('is_requester', false)
                     ->where('status', 'Approved');
             })
 
             ->orWhereHas('documentapprovals', function ($sub) use ($user) {
                 $sub->where('approver_id', $user->id)
+                ->where('is_requester', false)
                     ->where('status', 'Pending')
                     ->whereColumn('document_approvals.tier', 'documents.current_tier')
                     ->whereNotExists(function ($q) {
@@ -129,6 +133,7 @@ class InboxController extends Controller
 
             ->orWhereHas('documentapprovals', function ($sub) use ($user) {
                 $sub->where('approver_id', $user->id)
+                    ->where('is_requester', false)
                     ->where('status', 'Rejected')
                     ->whereColumn('document_approvals.tier', 'documents.current_tier');
             });
@@ -138,6 +143,7 @@ class InboxController extends Controller
 
         $status = request('status');
         $requester_id = request('requester_id');
+        $addressee_id = request('addressee_id');
         $from_date = request('from_date');
         $to_date = request('to_date');
         $search = request('search');
@@ -156,6 +162,13 @@ class InboxController extends Controller
 
         if ($requester_id) {
             $documents->where('requester_id', $requester_id);
+        }
+
+        if ($addressee_id) {
+            $documents->whereHas('documentApprovals', function ($q) use ($addressee_id) {
+                $q->where('approver_id', $addressee_id)
+                    ->where('is_requester', false);
+            });
         }
 
         if ($from_date) {
@@ -180,7 +193,7 @@ class InboxController extends Controller
 
         $folderOptions = $this->buildFolderOptions($rootFolders);
 
-        // ================= REQUESTER FILTER =================
+        // ================= REQUESTER / ADDRESSEE FILTER =================
 
         $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId) {
                 $q->where('organization_id', $organizationId);
@@ -188,10 +201,20 @@ class InboxController extends Controller
             ->orderBy('name')
             ->get();
 
+        $addresseeOptions = User::whereHas('documentapproval', function ($q) use ($organizationId) {
+                $q->where('is_requester', false)
+                    ->whereHas('document', function ($documentQuery) use ($organizationId) {
+                        $documentQuery->where('organization_id', $organizationId);
+                    });
+            })
+            ->orderBy('name')
+            ->get();
+
         return view('inbox.index', compact(
             'documents',
             'folderOptions',
-            'userOptions'
+            'userOptions',
+            'addresseeOptions'
         ));
     }
 
@@ -253,6 +276,13 @@ class InboxController extends Controller
     {
         $document = Documents::findOrFail($id);
 
+        if ($document->status === 'Cancelled') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This document has been withdrawn.'
+            ], 400);
+        }
+
         if ($document->status === 'Approved') {
             return response()->json([
                 'success' => false,
@@ -261,7 +291,7 @@ class InboxController extends Controller
         }
 
         $approver = auth()->user();
-        $approvalTime = now()->format('d M Y H:i');
+        $approvalTime = now()->format('d F Y H:i');
         $textToInsert = "Approved by {$approver->name}";
 
         // Ambil approval record
@@ -478,6 +508,25 @@ class InboxController extends Controller
     public function bulkApprove(Request $request)
     {
         $documentIds = $request->input('document_ids', []);
+    $documents = Document::whereIn('id', $documentIds)->get();
+
+    $invalidDocs = [];
+
+    foreach ($documents as $doc) {
+        if ($doc->status === 'Approved') {
+            $invalidDocs[] = "<strong>{$doc->document_name}</strong>: Document Status Already Approved";
+        } elseif ($doc->status === 'Rejected') {
+            $invalidDocs[] = "<strong>{$doc->document_name}</strong>: Document Status Already Rejected";
+        }
+    }
+
+    if (count($invalidDocs) > 0) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Some documents could not be approved.',
+            'invalid_documents' => $invalidDocs
+        ], 422);
+    }
         
         if (empty($documentIds)) {
             return response()->json([
@@ -571,7 +620,7 @@ class InboxController extends Controller
     }
     private function processSingleApproval($document, $documentApproval, $approver, $id)
     {
-        $approvalTime = now()->format('d M Y H:i');
+        $approvalTime = now()->format('d F Y H:i');
         $textToInsert = "Approved by {$approver->name}";
 
         $documentApproval = DocumentApproval::where('document_id', $id)
@@ -727,6 +776,14 @@ class InboxController extends Controller
     public function reject(Request $request, $id)
     {
         $document = Documents::findOrFail($id);
+
+        if ($document->status === 'Cancelled') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This document has been withdrawn.'
+            ], 400);
+        }
+
         $reason = $request->input('reason');
 
         if (empty($reason)) {

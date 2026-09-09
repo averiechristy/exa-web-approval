@@ -15,11 +15,10 @@ class SlaDashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. Ambil data sesi organisasi aktif & user login
         $activeOrgId = session('active_organization_id');
         $authUserId = auth()->id();
 
-        // 2. Cek hak akses dan level role user login pada organisasi aktif
+        // 1. Cek hak akses dan role level
         $currentAccess = \App\Models\UserAccess::with('role')
             ->where('user_id', $authUserId)
             ->where('organization_id', $activeOrgId)
@@ -33,12 +32,11 @@ class SlaDashboardController extends Controller
             $roleLevel = $currentAccess->role->role_level;
             $userDivisionId = $currentAccess->division_id;
 
-            $managerLevelThreshold = 3; // Sesuaikan threshold level manager-mu
+            $managerLevelThreshold = 3;
 
             if ($roleName === 'MANAGER' || $roleLevel >= $managerLevelThreshold) {
                 $showStaffFilter = true;
 
-                // Ambil bawahan di divisi yang sama dengan level role di bawah manager
                 $staffUsers = User::where('id', '!=', $authUserId)
                     ->whereHas('userAccesses', function($q) use ($activeOrgId, $userDivisionId, $roleLevel) {
                         $q->where('organization_id', $activeOrgId)
@@ -52,8 +50,8 @@ class SlaDashboardController extends Controller
             }
         }
 
-        // 3. Bangun Query Utama berbasis DocumentApproval
-         $query = DocumentApproval::query()
+        // 2. Query Utama dengan Filter Eliminasi (Pruning)
+        $query = DocumentApproval::query()
             ->with([
                 'document.requester',
                 'division',
@@ -63,21 +61,34 @@ class SlaDashboardController extends Controller
                 $q->where('organization_id', $activeOrgId);
             });
 
+        // Filter: Abaikan step approval yang muncul SETELAH dokumen di-reject di step sebelumnya
+        $query->whereNotExists(function ($existReject) {
+            $existReject->select(DB::raw(1))
+                ->from('document_approvals as da_reject')
+                ->whereColumn('da_reject.document_id', 'document_approvals.document_id')
+                ->where('da_reject.status', 'Rejected')
+                ->where(function ($cond) {
+                    // Terjadi rejection di tier sebelumnya
+                    $cond->whereColumn('da_reject.tier', '<', 'document_approvals.tier')
+                        // Atau terjadi rejection di tier yang sama tapi oleh approver sebelum dia
+                        ->orWhere(function ($sameTier) {
+                            $sameTier->whereColumn('da_reject.tier', 'document_approvals.tier')
+                                     ->whereColumn('da_reject.approver_order', '<', 'document_approvals.approver_order');
+                        });
+                });
+        });
+
+        // Filter Kelayakan Status Approval (Historis vs Pending Aktif)
         $query->where(function ($q) {
-            // 1. Tetap hitung data historis yang sudah diselesaikan (Approved / Rejected)
             $q->whereIn('document_approvals.status', ['Approved', 'Rejected'])
-            
-            // 2. ATAU, hitung yang statusnya Pending, TAPI memang sudah giliran dia
             ->orWhere(function ($subQ) {
                 $subQ->where('document_approvals.status', 'Pending')
-                    // Syarat A: Tier-nya sama dengan current_tier di tabel documents
                     ->whereExists(function ($existDoc) {
                         $existDoc->select(DB::raw(1))
                             ->from('documents')
                             ->whereColumn('documents.id', 'document_approvals.document_id')
                             ->whereColumn('documents.current_tier', 'document_approvals.tier');
                     })
-                    // Syarat B: Tidak ada approver lain sebelum dia (di tier yg sama) yang masih Pending
                     ->whereNotExists(function ($existDa) {
                         $existDa->select(DB::raw(1))
                             ->from('document_approvals as da2')
@@ -111,40 +122,71 @@ class SlaDashboardController extends Controller
         }
         if ($request->filled('from_date')) {
             $query->whereDate('started_at', '>=', $request->from_date);
-        }
-            else {
-            // Default jika user tidak memilih tanggal
+        } else {
             $query->whereDate('started_at', '>=', now()->subDays(30)); 
         }
         if ($request->filled('to_date')) {
             $query->whereDate('started_at', '<=', $request->to_date);
         }
 
-        // Kunci base query yang sudah ter-filter untuk Summary & Widget
         $baseQuery = clone $query;
 
-        // ==================== SUMMARY ====================
-        $summary = [
-            'total'    => $baseQuery->count(), // Menghitung total data approval yang ditargetkan
-            'pending'  => (clone $baseQuery)->where('status', 'Pending')->count(),
-            'approved' => (clone $baseQuery)->where('status', 'Approved')->count(),
-            'rejected' => (clone $baseQuery)->where('status', 'Rejected')->count(),
-            'overdue' => (clone $baseQuery)
-                        ->where('status', 'Pending')
-                        ->whereNull('completed_at')
-                        ->where('due_at', '<', now())
-                        ->count(),
-        ];
+        // ==================== REVISI KALKULASI SUMMARY ====================
 
-        // Approved Hari Ini
-        $summary['approved_today'] = (clone $baseQuery)
-            ->where('status', 'Approved')
-            ->whereDate('completed_at', \Carbon\Carbon::today()) // menggunakan kolom completed_at sesuai DBML jika selesai
+        // Total data approval yang relevan
+        $totalCount = $baseQuery->count();
+
+        // 1. Pending: Hanya yang memang masih pending dan Dokumennya belum Rejected
+        $pendingCount = (clone $baseQuery)
+            ->where('document_approvals.status', 'Pending')
+            ->whereHas('document', fn($d) => $d->where('status', '!=', 'Rejected'))
             ->count();
 
-        // Average Approval Time (Dalam Hari)
+        // 2. Approved: Hanya yang status approval-nya Approved DAN status Dokumen Utamanya JUGA Approved
+        $approvedCount = (clone $baseQuery)
+            ->where('document_approvals.status', 'Approved')
+            ->whereHas('document', fn($d) => $d->where('status', 'Approved'))
+            ->count();
+
+        // 3. Rejected: Approval yang di-reject LANGSUNG oleh dirinya OR Approval milik dia yang tadinya Approved tapi DOKUMEN AKHIRNYA di-reject oleh approver tingkat lanjut
+        $rejectedCount = (clone $baseQuery)
+            ->where(function ($q) {
+                $q->where('document_approvals.status', 'Rejected')
+                  ->orWhere(function ($sub) {
+                      $sub->where('document_approvals.status', 'Approved')
+                          ->whereHas('document', fn($d) => $d->where('status', 'Rejected'));
+                  });
+            })
+            ->count();
+
+        // 4. Overdue
+        $overdueCount = (clone $baseQuery)
+            ->where('document_approvals.status', 'Pending')
+            ->whereNull('completed_at')
+            ->where('due_at', '<', now())
+            ->whereHas('document', fn($d) => $d->where('status', '!=', 'Rejected'))
+            ->count();
+
+        // 5. Approved Hari Ini
+        $approvedTodayCount = (clone $baseQuery)
+            ->where('document_approvals.status', 'Approved')
+            ->whereHas('document', fn($d) => $d->where('status', 'Approved'))
+            ->whereDate('completed_at', Carbon::today())
+            ->count();
+
+        $summary = [
+            'total'          => $totalCount,
+            'pending'        => $pendingCount,
+            'approved'       => $approvedCount,
+            'rejected'       => $rejectedCount,
+            'overdue'        => $overdueCount,
+            'approved_today' => $approvedTodayCount,
+        ];
+
+        // Average Approval Time (Hanya dihitung dari dokumen yang benar-benar Approved hingga akhir)
         $avgTime = (clone $baseQuery)
-            ->where('status', 'Approved')
+            ->where('document_approvals.status', 'Approved')
+            ->whereHas('document', fn($d) => $d->where('status', 'Approved'))
             ->whereNotNull('started_at')
             ->whereNotNull('completed_at')
             ->selectRaw("AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) / 86400) as avg_days")
@@ -152,70 +194,52 @@ class SlaDashboardController extends Controller
 
         $summary['avg_time'] = round($avgTime ?? 0, 1);
 
-        // SLA Compliance
-        $summary['compliance'] = $summary['approved'] == 0 
-            ? 0 
-            : round((($summary['approved'] - $summary['overdue']) / $summary['approved']) * 100, 2);
-
+        // SLA Analytics Calculation
         $slaSesuaiCount = (clone $baseQuery)
-            ->where('status', 'Approved')
+            ->where('document_approvals.status', 'Approved')
+            ->whereHas('document', fn($d) => $d->where('status', 'Approved'))
             ->where(function($q) {
                 $q->whereNull('due_at')
                 ->orWhereColumn('completed_at', '<=', 'due_at');
             })
             ->count();
 
-        // 2. Yang DI UJUNG TANDUK / BERESIKO (Masih Pending, belum overdue, tapi udah ngendap >= 3 hari)
         $slaBeresikoCount = (clone $baseQuery)
-            ->where('status', 'Pending')
+            ->where('document_approvals.status', 'Pending')
             ->whereNull('completed_at')
             ->where('due_at', '>=', now())
             ->whereRaw('EXTRACT(DAY FROM (CURRENT_DATE - started_at)) >= 3')
+            ->whereHas('document', fn($d) => $d->where('status', '!=', 'Rejected'))
             ->count();
 
-        // 3. Yang MELANGGAR SLA (Kasus si A masuk sini!)
         $slaMelampauiCount = (clone $baseQuery)
             ->where(function ($q) {
                 $q->where(function ($subQ) {
-                    // Kasus A: Sudah Approved/Rejected, tapi tanggal selesainya ngelewatin due_at
-                    $subQ->whereIn('status', ['Approved', 'Rejected'])
+                    $subQ->whereIn('document_approvals.status', ['Approved', 'Rejected'])
                         ->whereNotNull('due_at')
                         ->whereColumn('completed_at', '>', 'due_at');
                 })->orWhere(function ($subQ) {
-                    // Kasus B: Masih Pending sampai sekarang, dan duedate-nya sudah lewat
-                    $subQ->where('status', 'Pending')
+                    $subQ->where('document_approvals.status', 'Pending')
                         ->whereNull('completed_at')
                         ->where('due_at', '<', now());
                 });
             })
             ->count();
 
-            // 2. Kalkulasi Persentase Baru
-            $totalSlaDocs = $slaSesuaiCount + $slaBeresikoCount + $slaMelampauiCount;
+        $totalSlaDocs = $slaSesuaiCount + $slaBeresikoCount + $slaMelampauiCount;
 
-            $compliancePct = $totalSlaDocs > 0 ? round(($slaSesuaiCount / $totalSlaDocs) * 100) : 0;
-            $beresikoPct   = $totalSlaDocs > 0 ? round(($slaBeresikoCount / $totalSlaDocs) * 100) : 0;
-            $melampauiPct  = $totalSlaDocs > 0 ? round(($slaMelampauiCount / $totalSlaDocs) * 100) : 0;
+        $summary['compliance']         = $totalSlaDocs > 0 ? round(($slaSesuaiCount / $totalSlaDocs) * 100) : 0;
+        $summary['sla_beresiko_pct']   = $totalSlaDocs > 0 ? round(($slaBeresikoCount / $totalSlaDocs) * 100) : 0;
+        $summary['sla_melampaui_pct']  = $totalSlaDocs > 0 ? round(($slaMelampauiCount / $totalSlaDocs) * 100) : 0;
 
-            // Masukkan kembali ke summary untuk Blade
-            $summary['compliance']         = $compliancePct;
-            $summary['sla_beresiko_pct']   = $beresikoPct;
-            $summary['sla_melampaui_pct']  = $melampauiPct;
+        $summary['sla_sesuai_count']   = $slaSesuaiCount;
+        $summary['sla_beresiko_count'] = $slaBeresikoCount;
+        $summary['sla_melampaui_count'] = $slaMelampauiCount;
 
-            $summary['sla_sesuai_count']   = $slaSesuaiCount;
-            $summary['sla_beresiko_count'] = $slaBeresikoCount;
-            $summary['sla_melampaui_count'] = $slaMelampauiCount;
-        // // ==================== STATUS BREAKDOWN ====================
-        // $statusBreakdown = [
-        //     'butuh_approval' => $summary['pending'],
-        //     'approved'       => $summary['approved'],
-        //     'rejected'       => $summary['rejected'],
-        //     'overdue'        => $summary['overdue'],
-        // ];
-
-        // ==================== PENDING PRIORITIES ====================
+        // Pending Priorities
         $pendingDocs = (clone $baseQuery)
-            ->where('status', 'Pending')
+            ->where('document_approvals.status', 'Pending')
+            ->whereHas('document', fn($d) => $d->where('status', '!=', 'Rejected'))
             ->whereNull('completed_at')
             ->where('due_at', '>=', now())
             ->orderByRaw("CASE 
@@ -225,32 +249,25 @@ class SlaDashboardController extends Controller
             ->limit(10)
             ->get()
             ->map(function($approval) {
-                $started = \Carbon\Carbon::parse($approval->started_at);
-                $approval->aging = $started->isToday() ? 0 : round($started->diffInDays(\Carbon\Carbon::now()));
+                $started = Carbon::parse($approval->started_at);
+                $approval->aging = $started->isToday() ? 0 : round($started->diffInDays(Carbon::now()));
 
-                // --- Logika Priority Baru ---
                 if ($approval->due_at) {
-                    $now = \Carbon\Carbon::now();
-                    $dueAt = \Carbon\Carbon::parse($approval->due_at);
-                    
-                    // Hitung sisa jam menuju deadline (bisa bernilai negatif jika sudah lewat deadline)
+                    $now = Carbon::now();
+                    $dueAt = Carbon::parse($approval->due_at);
                     $hoursLeft = $now->diffInHours($dueAt, false);
 
                     if ($hoursLeft <= 12) {
-                        // Sisa waktu <= 12 jam ATAU sudah lewat deadline
                         $approval->priority = 'CRITICAL';
                         $approval->priority_class = 'danger';
                     } elseif ($hoursLeft <= 24) {
-                        // Sisa waktu antara 12 hingga 24 jam
                         $approval->priority = 'HIGH';
                         $approval->priority_class = 'warning';
                     } else {
-                        // Sisa waktu lebih dari 24 jam
                         $approval->priority = 'NORMAL';
                         $approval->priority_class = 'primary';
                     }
                 } else {
-                    // Jika due_at bernilai null
                     $approval->priority = 'NORMAL';
                     $approval->priority_class = 'primary';
                 }
@@ -258,9 +275,10 @@ class SlaDashboardController extends Controller
                 return $approval;
             });
 
-        // ==================== APPROVER WORKLOAD ====================
+        // Approver Workload
         $approverWorkload = (clone $baseQuery)
-            ->where('status', 'Pending')
+            ->where('document_approvals.status', 'Pending')
+            ->whereHas('document', fn($d) => $d->where('status', '!=', 'Rejected'))
             ->select('approver_id')
             ->selectRaw('COUNT(*) as total_pending')
             ->selectRaw('SUM(CASE WHEN is_overdue = true THEN 1 ELSE 0 END) as overdue_count')
@@ -273,18 +291,19 @@ class SlaDashboardController extends Controller
         $approverLabels = $approverWorkload->map(fn($w) => $w->approver->name ?? 'Unknown')->toArray();
         $approverData = $approverWorkload->map(fn($w) => $w->total_pending)->toArray();
 
-        // ==================== URGENT ALERTS ====================
+        // Urgent Alerts
         $urgentAlerts = (clone $baseQuery)
-            ->where('status', 'Pending')
-            ->whereNull('completed_at') // Supaya yang sudah complete tidak memicu alarm
+            ->where('document_approvals.status', 'Pending')
+            ->whereHas('document', fn($d) => $d->where('status', '!=', 'Rejected'))
+            ->whereNull('completed_at')
             ->where(function($q) {
-                $q->where('due_at', '<', now()) // Pengganti is_overdue = true
+                $q->where('due_at', '<', now())
                 ->orWhereRaw('EXTRACT(DAY FROM (CURRENT_DATE - started_at)) >= 5');
             })
-            ->orderBy('started_at', 'asc') // Menampilkan yang paling lama mengendap duluan
+            ->orderBy('started_at', 'asc')
             ->get();
 
-        // ==================== RECENT ACTIVITY ====================
+        // Recent Activities
         $recentActivities = DocumentApproval::with(['document.requester', 'approver'])
             ->whereHas('document', function ($q) use ($activeOrgId) {
                 $q->where('organization_id', $activeOrgId);
@@ -293,40 +312,37 @@ class SlaDashboardController extends Controller
             ->limit(8)
             ->get();
 
-        // ==================== GRAPH TREND 7 HARI ====================
-        // ==================== GRAPH TREND (DINAMIS 30 HARI / ACCORDING TO FILTER) ====================
+        // Trend Graph
         $trendLabels = [];
         $trendData   = [];
         $slaData     = [];
 
-        // 1. Tentukan Tanggal Mulai (Start) dan Tanggal Selesai (End)
-        // Prioritas: Input User -> Jika Kosong Gunakan Default 30 Hari Terakhir
         $startDate = $request->filled('from_date') 
-            ? \Carbon\Carbon::parse($request->from_date)->startOfDay() 
-            : \Carbon\Carbon::today()->subDays(29)->startOfDay();
+            ? Carbon::parse($request->from_date)->startOfDay() 
+            : Carbon::today()->subDays(29)->startOfDay();
 
         $endDate = $request->filled('to_date') 
-            ? \Carbon\Carbon::parse($request->to_date)->endOfDay() 
-            : \Carbon\Carbon::today()->endOfDay();
+            ? Carbon::parse($request->to_date)->endOfDay() 
+            : Carbon::today()->endOfDay();
 
-        // Fallback jika user salah memasukkan tanggal (start > end)
         if ($startDate->gt($endDate)) {
             $startDate = (clone $endDate)->subDays(29)->startOfDay();
         }
 
-        // 2. Loop Setiap Hari dari Start Date sampai End Date
         $currentDate = clone $startDate;
         while ($currentDate->lte($endDate)) {
-            // Label Format: Misal "23 Jul"
             $trendLabels[] = $currentDate->format('d M');
             
-            // Filter Query khusus untuk tanggal pada iterasi saat ini
             $dayQuery = (clone $baseQuery)->whereDate('completed_at', $currentDate->format('Y-m-d'));
 
-            $approvedOnDay = (clone $dayQuery)->where('status', 'Approved')->count();
+            $approvedOnDay = (clone $dayQuery)
+                ->where('document_approvals.status', 'Approved')
+                ->whereHas('document', fn($d) => $d->where('status', 'Approved'))
+                ->count();
             
-            // Menghitung SLA Compliance harian
-            $overdueOnDay  = (clone $dayQuery)->where('status', 'Approved')
+            $overdueOnDay  = (clone $dayQuery)
+                ->where('document_approvals.status', 'Approved')
+                ->whereHas('document', fn($d) => $d->where('status', 'Approved'))
                 ->where(function($q) {
                     $q->whereNotNull('due_at')
                     ->whereColumn('completed_at', '>', 'due_at');
@@ -337,27 +353,23 @@ class SlaDashboardController extends Controller
                 ? 0 
                 : round((($approvedOnDay - $overdueOnDay) / $approvedOnDay) * 100, 2);
 
-            // Increment 1 hari
             $currentDate->addDay();
         }
+
         return view('dashboard.sla', [
             'summary'          => $summary,
-            // 'statusBreakdown'  => $statusBreakdown,
             'pendingDocs'      => $pendingDocs,
             'approverWorkload' => $approverWorkload,
             'urgentAlerts'     => $urgentAlerts,
             'recentActivities' => $recentActivities,
-            
             'trendLabels'      => $trendLabels,
             'trendData'        => $trendData,
             'slaLabels'        => $trendLabels, 
             'slaData'          => $slaData,
             'approverLabels'   => $approverLabels,
             'approverData'     => $approverData,
-
             'showStaffFilter'  => $showStaffFilter,
             'staffUsers'       => $staffUsers,
-
             'organizations'    => Organization::orderBy('organization_name')->get(),
             'divisions'        => Division::orderBy('division_name')->get(),
             'approvers'        => User::orderBy('name')->get(),

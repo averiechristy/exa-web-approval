@@ -98,6 +98,17 @@
             </a>
         </li>
 
+        <div class="sidebar-heading">
+            Documents
+        </div>
+
+        <li class="nav-item {{ request()->routeIs('superadmin.documents.*') ? 'active' : '' }}">
+            <a class="nav-link" href="{{ route('superadmin.documents.index') }}">
+                <i class="fas fa-file-alt"></i>
+                <span>Document Management</span>
+            </a>
+        </li>
+
         <hr class="sidebar-divider">
     @endif
 

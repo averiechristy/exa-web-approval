@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuditTrailController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DivisionController;
+use App\Http\Controllers\SuperadminDocumentController;
 use App\Http\Controllers\FolderController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\MyDocumentController;
@@ -45,6 +46,9 @@ Route::middleware('auth')->group(function () {
     
     Route::get('/audit-trail', [AuditTrailController::class, 'index'])->name('audit-trail.index')->middleware('superadmin');
     Route::get('/audit-trail/{id}', [AuditTrailController::class, 'show'])->name('audit-trail.show')->middleware('superadmin');
+    Route::get('/superadmin/documents', [SuperadminDocumentController::class, 'index'])->name('superadmin.documents.index')->middleware('superadmin');
+    Route::get('/superadmin/documents/{document}/preview', [SuperadminDocumentController::class, 'preview'])->name('superadmin.documents.preview')->middleware('superadmin');
+    Route::post('/superadmin/documents/{document}/void', [SuperadminDocumentController::class, 'void'])->name('superadmin.documents.void')->middleware('superadmin');
     Route::resource('organization', OrganizationController::class)->middleware('superadmin');
     Route::resource('division', DivisionController::class)->middleware('superadmin');
     Route::resource('role', RoleController::class)->middleware('superadmin');

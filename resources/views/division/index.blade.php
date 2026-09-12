@@ -41,6 +41,7 @@
                     <thead class="bg-light">
                         <tr>
                             <th>Division Name</th>
+                            <th>Organization</th>
                             <th width="150">Action</th>
                         </tr>
                     </thead>
@@ -48,11 +49,13 @@
                         @forelse ($division as $item)
                             <tr>
                                 <td>{{ $item->division_name }}</td>
+                                <td>{{ $item->organization?->organization_name ?? '-' }}</td>
                                 <td class="text-center">
                                     <button 
                                         class="btn btn-sm btn-light editBtn" 
                                         data-id="{{ $item->id }}"
                                         data-name="{{ $item->division_name }}"
+                                        data-organization-id="{{ $item->organization_id }}"
                                         data-toggle="modal" 
                                         data-target="#editModal"
                                     >
@@ -72,7 +75,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="2" class="text-center text-muted">
+                                <td colspan="3" class="text-center text-muted">
                                     No data available
                                 </td>
                             </tr>
@@ -140,6 +143,15 @@
                 @csrf
                     <div class="modal-body">
                         <div class="form-group">
+                            <label>Organization</label>
+                            <select name="organization_id" class="form-control" required>
+                                <option value="">Select Organization</option>
+                                @foreach($organizations as $organization)
+                                    <option value="{{ $organization->id }}">{{ $organization->organization_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Division Name</label>
                             <input 
                                 type="text" 
@@ -183,6 +195,16 @@
 
                 <div class="modal-body">
                     <input type="hidden" id="editId">
+
+                    <div class="form-group">
+                        <label>Organization</label>
+                        <select name="organization_id" id="editOrganization" class="form-control" required>
+                            <option value="">Select Organization</option>
+                            @foreach($organizations as $organization)
+                                <option value="{{ $organization->id }}">{{ $organization->organization_name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
 
                     <div class="form-group">
                         <label>Division Name</label>
@@ -273,11 +295,13 @@
     $('.editBtn').on('click', function() {
         let id = $(this).data('id');
         let name = $(this).data('name');
+        let organizationId = $(this).data('organization-id');
 
         originalName = name;
 
         $('#editId').val(id);
         $('#editName').val(name);
+        $('#editOrganization').val(organizationId);
 
         $('#editForm').attr('action', '/division/' + id);
 

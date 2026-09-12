@@ -28,6 +28,8 @@ class AuthController extends Controller
             ]);
         }
 
+        $request->session()->regenerate();
+
         $user = Auth::user();
 
         if (!$user->is_active) {
@@ -59,13 +61,16 @@ class AuthController extends Controller
 
         $access = $userAccesses->first();
 
-        session([
-            'is_superadmin' => false,
-            'active_access_id' => $access->id,
-            'active_organization_id' => $access->organization_id,
-            'active_division_id' => $access->division_id,
-            'active_role_id' => $access->role_id,
-        ]);
+        if ($userAccesses->count() > 1) {
+            session([
+                'is_superadmin' => false,
+                'pending_context_selection' => true,
+            ]);
+
+            return redirect()->route('context.choose');
+        }
+
+        $this->setActiveContext($access);
 
         return redirect('/dashboard/sla');
     }
@@ -76,15 +81,52 @@ class AuthController extends Controller
             ->where('user_id', auth()->id())
             ->firstOrFail();
 
+        $this->setActiveContext($access);
+
+        return response()->json([
+            'message' => 'Context switched'
+        ]);
+    }
+
+    public function chooseContext()
+    {
+        $user = auth()->user();
+
+        if ($user->isSuperadmin()) {
+            return redirect('/dashboard');
+        }
+
+        return view('auth.context', [
+            'accesses' => $user->userAccesses()
+                ->with(['organization', 'division', 'role'])
+                ->get(),
+        ]);
+    }
+
+    public function selectContext(Request $request)
+    {
+        $validated = $request->validate([
+            'access_id' => ['required', 'integer'],
+        ]);
+
+        $access = UserAccess::whereKey($validated['access_id'])
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $this->setActiveContext($access);
+        session()->forget('pending_context_selection');
+
+        return redirect()->route('dashboard.sla');
+    }
+
+    private function setActiveContext(UserAccess $access): void
+    {
         session([
+            'is_superadmin' => false,
             'active_access_id' => $access->id,
             'active_organization_id' => $access->organization_id,
             'active_division_id' => $access->division_id,
             'active_role_id' => $access->role_id,
-        ]);
-
-        return response()->json([
-            'message' => 'Context switched'
         ]);
     }
 

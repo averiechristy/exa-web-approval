@@ -20,6 +20,7 @@ class MyDocumentController extends Controller
     {
         $user = auth()->user();
         $organizationId = session('active_organization_id') ?? $user->current_organization_id ?? 1;
+        $divisionId = session('active_division_id');
 
         // Search folder
         $folderSearch = request('folder_search');
@@ -50,6 +51,7 @@ class MyDocumentController extends Controller
     {
         $user = auth()->user();
         $organizationId = session('active_organization_id') ?? $user->current_organization_id ?? 1;
+        $divisionId = session('active_division_id');
 
         if ($folder->organization_id !== $organizationId) {
             return redirect()->route('mydoc.index');
@@ -73,6 +75,7 @@ class MyDocumentController extends Controller
 $documents = Documents::with(['requester'])
     ->where('folder_id', $folder->id)
     ->where('organization_id', $organizationId)
+    ->when($divisionId, fn ($query) => $query->where('requester_division_id', $divisionId))
     ->where('status', 'Approved') // workflow sudah selesai
     ->whereHas('documentapprovals', function ($q) use ($user) {
         $q->where('approver_id', $user->id)

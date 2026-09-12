@@ -218,7 +218,7 @@
                                     <select name="organizations[0][division_id]" class="form-control division-select">
                                         <option value="">Select</option>
                                         @foreach($divisions as $div)
-                                            <option value="{{ $div->id }}">{{ $div->division_name }}</option>
+                                            <option value="{{ $div->id }}" data-organization-id="{{ $div->organization_id }}">{{ $div->division_name }}</option>
                                         @endforeach
                                     </select>
                                     <small class="text-danger"></small>
@@ -481,7 +481,7 @@ $(document).on("click", ".btn-detail", function () {
     // Division Options  
     const divisionOptions = `
         @foreach($divisions as $div)
-        <option value="{{ $div->id }}">{{ $div->division_name }}</option>
+        <option value="{{ $div->id }}" data-organization-id="{{ $div->organization_id }}">{{ $div->division_name }}</option>
         @endforeach
     `;
     
@@ -512,6 +512,31 @@ $(document).ready(function() {
 
     $(document).on('change', '#systemRoleSelect', function() {
         toggleOrganizationSection();
+    });
+
+    function filterDivisionOptions(row, selectedDivisionId = '') {
+        const organizationId = row.find('.org-select').val();
+        const divisionSelect = row.find('.division-select');
+
+        divisionSelect.find('option').each(function() {
+            const matches = !this.value || String($(this).data('organization-id')) === String(organizationId);
+            $(this).toggle(matches);
+        });
+
+        const selectedOption = divisionSelect.find(`option[value="${selectedDivisionId}"]`);
+        if (selectedDivisionId && String(selectedOption.data('organization-id')) === String(organizationId)) {
+            divisionSelect.val(selectedDivisionId);
+        } else {
+            divisionSelect.val('');
+        }
+    }
+
+    $(document).on('change', '.org-select', function() {
+        filterDivisionOptions($(this).closest('.org-row'));
+    });
+
+    $('.org-row').each(function() {
+        filterDivisionOptions($(this));
     });
 
     // --- ADD ORGANIZATION ROW ---
@@ -615,12 +640,13 @@ $(document).ready(function() {
 
         // Organization Validation (Skipped for Super Admin)
         if ($('#systemRoleSelect').val() != 1) {  // Skip kalau Super Admin
-        let orgIds = [];
+        let accessPairs = [];
         let duplicateFound = false;
 
         $('.org-row').each(function() {
             let orgSelect = $(this).find('.org-select');
             let orgId = orgSelect.val();
+            let divisionId = $(this).find('.division-select').val();
 
             // Validasi kosong
             if (orgId === '') {
@@ -629,12 +655,13 @@ $(document).ready(function() {
             } 
             // Validasi duplicate
             else {
-                if (orgIds.includes(orgId)) {
-                    setError(orgSelect, 'Organization already selected');
+                const accessPair = `${orgId}:${divisionId}`;
+                if (accessPairs.includes(accessPair)) {
+                    setError(orgSelect, 'Organization and division already selected');
                     duplicateFound = true;
                     isValid = false;
                 } else {
-                    orgIds.push(orgId);
+                    accessPairs.push(accessPair);
                 }
             }
 
@@ -655,8 +682,8 @@ $(document).ready(function() {
         if (duplicateFound) {
             Swal.fire({
                 icon: 'error',
-                title: 'Duplicate Organization',
-                text: 'One user cannot have the same organization more than once.',
+                title: 'Duplicate Access',
+                text: 'One user cannot have the same organization and division more than once.',
                 confirmButtonColor: '#d33'
             });
         }
@@ -725,7 +752,7 @@ $(document).ready(function() {
                     <select name="organizations[0][division_id]" class="form-control division-select">
                         <option value="">Select</option>
                         @foreach($divisions as $div)
-                            <option value="{{ $div->id }}">{{ $div->division_name }}</option>
+                            <option value="{{ $div->id }}" data-organization-id="{{ $div->organization_id }}">{{ $div->division_name }}</option>
                         @endforeach
                     </select>
                     <small class="text-danger"></small>
@@ -820,7 +847,7 @@ $(document).ready(function() {
             // Build division dropdown HTML  
             let divOptions = `<option value="">Select</option>`;
             @foreach($divisions as $d)
-                divOptions += `<option value="{{ $d->id }}" ${org.division_id == {{ $d->id }} ? 'selected' : ''}>{{ $d->division_name }}</option>`;
+                divOptions += `<option value="{{ $d->id }}" data-organization-id="{{ $d->organization_id }}">{{ $d->division_name }}</option>`;
             @endforeach
             
             // Build role dropdown HTML
@@ -875,6 +902,7 @@ $(document).ready(function() {
         // ✅ LOAD MANAGER UNTUK SETIAP ROW SETELAH HTML DI-GENERATE
         $('#editOrgContainer .org-row').each(function(index) {
             let row = $(this);
+            filterDivisionOptions(row, organizations[index].division_id);
             let orgId = row.find('.org-select').val();
             let divId = row.find('.division-select').val();
             let roleId = row.find('.role-select').val();

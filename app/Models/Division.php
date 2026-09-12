@@ -12,12 +12,18 @@ class Division extends Model
     use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'division_name'
+        'division_name',
+        'organization_id'
     ];
 
     public function useraccess()
     {
         return $this->hasMany(UserAccess::class);
+    }
+
+    public function organization()
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function workflowstep()

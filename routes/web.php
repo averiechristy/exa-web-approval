@@ -33,10 +33,14 @@ Route::post('/switch-context', [AuthController::class, 'switchContext'])
     ->middleware('auth');
 
 Route::post('/logout', [AuthController::class, 'logout'])
-    ->middleware('auth');
+    ->middleware('auth')
+    ->name('logout');
     
 
 Route::middleware('auth')->group(function () {
+
+    Route::get('/choose-context', [AuthController::class, 'chooseContext'])->name('context.choose');
+    Route::post('/choose-context', [AuthController::class, 'selectContext'])->name('context.select');
 
     Route::get('/dashboard', function () {
         return view('dashboard');

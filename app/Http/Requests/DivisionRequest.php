@@ -18,6 +18,10 @@ class DivisionRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'organization_id' => [
+                'required',
+                'exists:organizations,id',
+            ],
             'division_name' => [
                 'min:1',
                 'max:24',
@@ -26,6 +30,7 @@ class DivisionRequest extends FormRequest
                 function ($attribute, $value, $fail) {
                     $exists = DB::table('divisions')
                         ->whereNull('deleted_at')
+                        ->where('organization_id', $this->organization_id)
                         ->whereRaw(
                             'LOWER(division_name) = ?',
                             [strtolower($value)]

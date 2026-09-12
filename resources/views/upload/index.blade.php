@@ -1057,7 +1057,7 @@ if (missingFields.length > 0) {
                 response.workflow_steps.forEach(group => {
                     const tier = parseInt(group.tier);
                     if (group.users && group.users.length > 0) {
-                        addApproverRow(tier, group.users, group.division_id || '');
+                        addApproverRow(tier, group.users, group.division_id || '', group.division_name || '');
                     }
                 });
 
@@ -1067,7 +1067,8 @@ if (missingFields.length > 0) {
                     const tier = $(this).data('tier');
                     const divisionId = $(this).data('division-id') || '';
                     const users = response.workflow_steps.find(g => parseInt(g.tier) === tier)?.users || [];
-                    addApproverRow(tier, users, divisionId);
+                    const divisionName = $(this).closest('.tier-box').find('h6').text().trim();
+                    addApproverRow(tier, users, divisionId, divisionName);
                 });
             },
             error: function() {
@@ -1118,13 +1119,13 @@ function renderRequesterSection() {
 
 // Panggil fungsi ini setelah load approvers
     // Fungsi untuk menambah row approver di dalam tier
-    function addApproverRow(tier, usersList, divisionId = '') {
+    function addApproverRow(tier, usersList, divisionId = '', divisionName = '') {
         const container = $(`.approvers-list[data-tier="${tier}"]`);
         
         let options = '<option value="">-- Select Approver --</option>';
         usersList.forEach(user => {
             options += `<option value="${user.id}" data-division="${user.division_id || divisionId}">
-                ${user.name}
+                ${user.name} - ${user.role_name || 'User'}${divisionName ? ` (${divisionName})` : ''}
             </option>`;
         });
 
@@ -1211,7 +1212,7 @@ function renderRequesterSection() {
                 <option value="${user.id}"
                         data-org="${user.organization_id}"
                         data-division="${user.division_id || ''}">
-                    ${user.name}${user.division_name ? ` - ${user.division_name}` : ''}
+                    ${user.name}${user.organization_name ? ` - ${user.organization_name}` : ''}${user.division_name ? ` / ${user.division_name}` : ''}
                 </option>
             `;
         });

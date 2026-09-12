@@ -20,6 +20,11 @@ class Organization extends Model
         return $this->hasMany(UserAccess::class);
     }
 
+    public function divisions()
+    {
+        return $this->hasMany(Division::class);
+    }
+
     public function workflow()
     {
         return $this->hasMany(Workflow::class);

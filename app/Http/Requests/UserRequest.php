@@ -67,13 +67,22 @@ class UserRequest extends FormRequest
 
             $rules['organizations.*.organization_id'] = [
                 'required',
-                'exists:organizations,id',
-                'distinct'
+                'exists:organizations,id'
             ];
 
             $rules['organizations.*.division_id'] = [
                 'required',
-                'exists:divisions,id'
+                'exists:divisions,id',
+                function ($attribute, $value, $fail) {
+                    preg_match('/organizations\.(\d+)\.division_id/', $attribute, $matches);
+                    $organizationId = $this->input("organizations.{$matches[1]}.organization_id");
+
+                    if (!\App\Models\Division::whereKey($value)
+                        ->where('organization_id', $organizationId)
+                        ->exists()) {
+                        $fail('The selected division does not belong to the selected organization.');
+                    }
+                },
             ];
 
             $rules['organizations.*.role_id'] = [
@@ -88,6 +97,26 @@ class UserRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $pairs = [];
+
+            foreach ($this->input('organizations', []) as $index => $organization) {
+                $pair = ($organization['organization_id'] ?? '') . ':' . ($organization['division_id'] ?? '');
+
+                if ($pair !== ':' && in_array($pair, $pairs, true)) {
+                    $validator->errors()->add(
+                        "organizations.{$index}.division_id",
+                        'The organization and division combination must be unique.'
+                    );
+                }
+
+                $pairs[] = $pair;
+            }
+        });
     }
 
     public function messages(): array
@@ -109,7 +138,6 @@ class UserRequest extends FormRequest
             // ORGANIZATION
             'organizations.required' => 'Organization is required',
             'organizations.*.organization_id.required' => 'Organization is required',
-            'organizations.*.organization_id.distinct' => 'Organization must be unique',
             'organizations.*.division_id.required' => 'Division is required',
             'organizations.*.role_id.required' => 'Role is required',
         ];

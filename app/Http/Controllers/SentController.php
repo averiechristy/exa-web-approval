@@ -20,6 +20,7 @@ class SentController extends Controller
         $organizationId = session('active_organization_id')
             ?? $user->current_organization_id
             ?? 1;
+        $divisionId = session('active_division_id');
 
     $documents = Documents::with([
             'requester',
@@ -27,6 +28,9 @@ class SentController extends Controller
             'folder.parent'
         ])
         ->where('organization_id', $organizationId);
+        if ($divisionId) {
+            $documents->where('requester_division_id', $divisionId);
+        }
 
         // ================= FILTER =================
 
@@ -178,10 +182,12 @@ class SentController extends Controller
         $organizationId = session('active_organization_id')
             ?? $user->current_organization_id
             ?? 1;
+        $divisionId = session('active_division_id');
 
         $document = Documents::with('documentApprovals')
             ->where('organization_id', $organizationId)
             ->where('requester_id', $user->id)
+            ->when($divisionId, fn ($query) => $query->where('requester_division_id', $divisionId))
             ->findOrFail($id);
 
         $recipientApprovals = $document->documentApprovals

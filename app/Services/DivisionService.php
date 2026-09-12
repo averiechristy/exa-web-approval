@@ -32,7 +32,8 @@ class DivisionService
     public function createDivision($data)
     {
         $division = Division::create([
-            'division_name' => $data['division_name']
+            'division_name' => $data['division_name'],
+            'organization_id' => $data['organization_id'],
         ]);
 
         LogActivityJob::dispatchSync(
@@ -55,6 +56,7 @@ class DivisionService
     {
         $oldData = [
             'division_name' => $division->division_name,
+            'organization_id' => $division->organization_id,
         ];
 
         $division->update($data);
@@ -69,6 +71,7 @@ class DivisionService
                 'old' => $oldData,
                 'attributes' => [
                     'division_name' => $division->division_name,
+                    'organization_id' => $division->organization_id,
                 ],
             ],
         );
@@ -89,6 +92,7 @@ class DivisionService
 
         $oldData = [
             'division_name' => $division->division_name,
+            'organization_id' => $division->organization_id,
         ];
 
         LogActivityJob::dispatchSync(

@@ -23,6 +23,7 @@ class SharedController extends Controller
         $organizationId = session('active_organization_id')
             ?? $user->current_organization_id
             ?? 1;
+        $divisionId = session('active_division_id');
 
         $status = request('status');
         $requester_id = request('requester_id');
@@ -37,6 +38,7 @@ class SharedController extends Controller
         $query = Documents::with(['requester'])
             ->where('organization_id', $organizationId)
             ->whereIn('id', $sharedDocumentIds)
+            ->when($divisionId, fn ($query) => $query->where('requester_division_id', $divisionId))
             ->where('status', 'Approved');
 
         if (!empty($search)) {

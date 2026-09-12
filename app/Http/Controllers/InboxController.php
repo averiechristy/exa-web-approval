@@ -100,6 +100,7 @@ class InboxController extends Controller
         $organizationId = session('active_organization_id')
             ?? $user->current_organization_id
             ?? 1;
+        $divisionId = session('active_division_id');
 
         $documents = Documents::with([
                 'requester',
@@ -112,12 +113,14 @@ class InboxController extends Controller
 
             $q->whereHas('documentapprovals', function ($sub) use ($user) {
                 $sub->where('approver_id', $user->id)
+                ->when(session('active_division_id'), fn ($query) => $query->where('division_id', session('active_division_id')))
                 ->where('is_requester', false)
                     ->where('status', 'Approved');
             })
 
             ->orWhereHas('documentapprovals', function ($sub) use ($user) {
                 $sub->where('approver_id', $user->id)
+                    ->when(session('active_division_id'), fn ($query) => $query->where('division_id', session('active_division_id')))
                 ->where('is_requester', false)
                     ->where('status', 'Pending')
                     ->whereColumn('document_approvals.tier', 'documents.current_tier')
@@ -133,6 +136,7 @@ class InboxController extends Controller
 
             ->orWhereHas('documentapprovals', function ($sub) use ($user) {
                 $sub->where('approver_id', $user->id)
+                    ->when(session('active_division_id'), fn ($query) => $query->where('division_id', session('active_division_id')))
                     ->where('is_requester', false)
                     ->where('status', 'Rejected')
                     ->whereColumn('document_approvals.tier', 'documents.current_tier');
@@ -195,14 +199,18 @@ class InboxController extends Controller
 
         // ================= REQUESTER / ADDRESSEE FILTER =================
 
-        $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId) {
+        $userOptions = User::whereHas('userAccesses', function ($q) use ($organizationId, $divisionId) {
                 $q->where('organization_id', $organizationId);
+            if ($divisionId) {
+                $q->where('division_id', $divisionId);
+            }
             })
             ->orderBy('name')
             ->get();
 
-        $addresseeOptions = User::whereHas('documentapproval', function ($q) use ($organizationId) {
+        $addresseeOptions = User::whereHas('documentapproval', function ($q) use ($organizationId, $divisionId) {
                 $q->where('is_requester', false)
+                ->when($divisionId, fn ($query) => $query->where('division_id', $divisionId))
                     ->whereHas('document', function ($documentQuery) use ($organizationId) {
                         $documentQuery->where('organization_id', $organizationId);
                     });

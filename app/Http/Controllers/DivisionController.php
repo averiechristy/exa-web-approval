@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\DivisionRequest;
 use App\Models\Division;
+use App\Models\Organization;
 use App\Services\DivisionService;
 use Illuminate\Http\Request;
 
@@ -23,7 +24,8 @@ class DivisionController extends Controller
         $division = $this->divisionService->getDivision($perPage ?? 10, $search);
 
         return view('division.index',[
-            'division' => $division
+            'division' => $division,
+            'organizations' => Organization::orderBy('organization_name')->get(),
         ]);
     }
 

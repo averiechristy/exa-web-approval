@@ -39,7 +39,7 @@ class UserController extends Controller
         return view('user.index',[
             'user' => $user,
             'organizations' => Organization::all(),
-            'divisions' => Division::all(),
+            'divisions' => Division::with('organization')->orderBy('division_name')->get(),
             'roles' => Role::all(),
             'systemRoles' => SystemRole::all(),
         ]);
@@ -138,7 +138,12 @@ class UserController extends Controller
          */
     // Di Controller
     public function edit($id) {
-        $user = User::with(['organizations.manager'])->findOrFail($id);
+        $user = User::with([
+            'userAccesses.organization',
+            'userAccesses.division',
+            'userAccesses.role',
+            'userAccesses.manager',
+        ])->findOrFail($id);
         
         return response()->json([
             'id' => $user->id,
@@ -146,7 +151,7 @@ class UserController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'username' => $user->username,
-            'organizations' => $user->organizations->map(function($org) {
+            'organizations' => $user->userAccesses->map(function($org) {
                 return [
                     'organization_id' => $org->organization_id,
                     'division_id' => $org->division_id,

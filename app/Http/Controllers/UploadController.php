@@ -141,20 +141,14 @@ class UploadController extends Controller
                 'success' => true,
                 'users' => $users
             ]);
-                $organizationId = auth()->user()->isSuperadmin()
-                    ? $request->get('organization_id')
-                    : session('active_organization_id');
+    }
 
 public function getWorkflowApprovers($workflowId, Request $request)
 {
     $orgId = $request->organization_id;
-                        'organizations.organization_name as organization_name',
-                        'user_accesses.organization_id',
-                        'user_accesses.division_id',
-                        'divisions.division_name as division_name'
+    $requesterDivisionId = $request->division_id;   // division requester
     $currentUser = auth()->user();
     $activeRoleId = session('active_role_id');
-                    ->join('organizations', 'user_accesses.organization_id', '=', 'organizations.id')
 
     $activeRoleLevel = Role::where('id', $activeRoleId)->value('role_level');
     $highestRoleLevel = Role::max('role_level');
@@ -184,10 +178,6 @@ public function getWorkflowApprovers($workflowId, Request $request)
                 return [
                     'id'         => $access->user?->id,
                     'name'       => $access->user?->name ?? 'Unknown User',
-                    'organization_id' => $access->organization_id,
-                    'division_id' => $access->division_id,
-                    'organization_name' => $access->organization?->organization_name ?? '',
-                    'division_name' => $access->division?->division_name ?? '',
                     'role_name'  => $access->role?->role_name ?? '',
                     'role_level' => $access->role?->role_level,
                     'source'     => 'same_division'
@@ -237,10 +227,6 @@ public function getWorkflowApprovers($workflowId, Request $request)
                 return [
                     'id'         => $access->user?->id,
                     'name'       => $access->user?->name ?? 'Unknown User',
-                    'organization_id' => $access->organization_id,
-                    'division_id' => $access->division_id,
-                    'organization_name' => $access->organization?->organization_name ?? '',
-                    'division_name' => $access->division?->division_name ?? '',
                     'role_name'  => $access->role?->role_name ?? '',
                     'role_level' => $access->role?->role_level,
                     'source'     => 'workflow'
@@ -289,23 +275,6 @@ public function getWorkflowApprovers($workflowId, Request $request)
             if (empty($uploadedFiles)) {
                 return response()->json(['message' => 'No files uploaded'], 422);
             }
-
-            $isSuperAdmin = auth()->user()->isSuperadmin();
-            $organizationId = $isSuperAdmin
-                ? ($payload['document']['organization_id'] ?? null)
-                : session('active_organization_id');
-            $divisionId = $isSuperAdmin
-                ? ($payload['document']['requester_division_id'] ?? null)
-                : session('active_division_id');
-
-            $divisionIsValid = $organizationId && $divisionId && Division::whereKey($divisionId)
-                ->where('organization_id', $organizationId)
-                ->exists();
-
-            if (!$divisionIsValid) {
-                return response()->json(['message' => 'The selected division does not belong to the active organization.'], 422);
-            }
-
             DB::beginTransaction();
 
             $folderName = 'documents/' . date('Y/m/d');
@@ -323,13 +292,13 @@ public function getWorkflowApprovers($workflowId, Request $request)
                 
                 // Create Document
                 $document = Documents::create([
-                    'organization_id'       => $organizationId,
+                    'organization_id'       => $payload['document']['organization_id'],
                     'folder_id'             => $payload['document']['folder_id'],
                     'document_name'         => $meta['name'] ?? 'Untitled',
                     'path'                  => $path,
                     'status'                => 'Need Approval',
                     'requester_id'          => auth()->id(),
-                    'requester_division_id' => $divisionId,
+                    'requester_division_id' => $payload['document']['requester_division_id'] ?? null,
                     'workflow_id'           => $payload['document']['workflow_id'],
                     'current_tier'          => 0,
                     'placement_type'        => $payload['placement_type'] ?? 'custom',

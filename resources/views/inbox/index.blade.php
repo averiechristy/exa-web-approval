@@ -513,6 +513,7 @@ $('#requesterSelect, #addresseeSelect').select2({
         allowClear: true,
         width: '100%'
     });
+
 $(document).ready(function () {
 
     $('.btn-move-folder').on('click', function (e) {

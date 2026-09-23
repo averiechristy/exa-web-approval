@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Documents;
+use App\Models\DocumentApproval;
 use App\Models\DocumentShare;
 use App\Models\Folder;
 use App\Models\User;
@@ -95,7 +96,13 @@ class SharedController extends Controller
             $folder = Folder::find($document->folder_id);
         }
 
-        return view('shared.preview', compact('document', 'folder'));
+        $rejectionApproval = DocumentApproval::with('approver')
+            ->where('document_id', $document->id)
+            ->where('status', 'Rejected')
+            ->latest('completed_at')
+            ->first();
+
+        return view('shared.preview', compact('document', 'folder', 'rejectionApproval'));
     }
 
     public function download($id)

@@ -275,7 +275,8 @@
         division_id: {{ session('active_division_id') ?? 'null' }},
         is_requester: true
     };
-    const requesterIsHighestRole = @json($requesterIsHighestRole ?? false); 
+    let requesterIsHighestRole = @json($requesterIsHighestRole ?? false);
+    window.requesterIsHighestRole = requesterIsHighestRole;
     let currentStep = 0;
     let step1Data = {}; 
     const steps = document.querySelectorAll('.step');
@@ -976,6 +977,9 @@ if (missingFields.length > 0) {
 
         $('.tier-box').each(function() {
             const tier = $(this).data('tier');
+            if (parseInt(tier) === 0 && requesterIsHighestRole) {
+                return;
+            }
             const selectedApprovers = $(this).find('.approver-select').filter(function() {
                 return $(this).val() !== '';
             }).length;
@@ -985,6 +989,19 @@ if (missingFields.length > 0) {
                 errorMessage += `• Tier ${tier} has no approver selected<br>`;
             }
         });
+
+        const selectedApproverIds = [];
+        $('.tier-box .approver-select').each(function() {
+            const approverId = $(this).val();
+            if (approverId) selectedApproverIds.push(parseInt(approverId));
+        });
+
+        if (selectedApproverIds.length !== new Set(selectedApproverIds).size) {
+            return {
+                valid: false,
+                message: 'The same person cannot be selected to approve the document in different tiers.'
+            };
+        }
 
         if (!isValid) {
             return {
@@ -1012,6 +1029,8 @@ if (missingFields.length > 0) {
             },
             success: function(response) {
                 $('#tierContainer').empty();
+                requesterIsHighestRole = response.requester_is_highest_role === true;
+                window.requesterIsHighestRole = requesterIsHighestRole;
 
                 if (!response.workflow_steps || response.workflow_steps.length === 0) {
                     $('#tierContainer').html('<p class="text-warning">No approvers available.</p>');
@@ -1021,10 +1040,6 @@ if (missingFields.length > 0) {
                 response.workflow_steps.forEach(group => {
                     const tier = parseInt(group.tier);
 
-                    if (tier === 0 && window.requesterIsHighestRole) {
-                        console.log('Tier 0 skipped - Requester is highest role');
-                        return;
-                    }
                     const isTierZero = tier === 0;
 
                     let tierHtml = `
@@ -1039,7 +1054,11 @@ if (missingFields.length > 0) {
                         </h6>
                         <div class="approvers-list" data-tier="${tier}" data-division-id="${group.division_id || ''}"></div>
                         
-                        ${`
+                        ${tier === 0 && requesterIsHighestRole ? `
+                        <div class="alert alert-info py-2 mt-2 mb-0 small">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            You are the highest-level approver in this division, so Tier 0 is optional.
+                        </div>` : `
                         <button type="button"
                                 class="btn btn-outline-primary btn-sm mt-2 add-approver-per-tier"
                                 data-tier="${tier}"
@@ -1080,11 +1099,6 @@ if (missingFields.length > 0) {
 // ================= REQUESTER SECTION (di atas Approver List) =================
 function renderRequesterSection() {
     const requesterSection = document.getElementById('requesterSection');
-    
-    if (window.requesterIsHighestRole) {
-        requesterSection.innerHTML = '';
-        return;
-    }
 
     const requesterHtml = `
         <div class="tier-box border rounded p-3 bg-light">
@@ -1414,6 +1428,29 @@ function renderRequesterSection() {
         }
 
         if (files.length === 0) return;
+
+        const existingNames = new Set(uploadedFiles.map(file => file.name.toLowerCase()));
+        const incomingNames = new Set();
+        const duplicateNames = [];
+
+        files = files.filter(file => {
+            const normalizedName = file.name.toLowerCase();
+            if (existingNames.has(normalizedName) || incomingNames.has(normalizedName)) {
+                duplicateNames.push(file.name);
+                return false;
+            }
+            incomingNames.add(normalizedName);
+            return true;
+        });
+
+        if (duplicateNames.length > 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Duplicate Document Name',
+                text: `These document names are already selected: ${duplicateNames.join(', ')}`,
+                confirmButtonText: 'OK'
+            });
+        }
 
         files.forEach(file => {
             if (file.type !== "application/pdf") {
@@ -2128,6 +2165,26 @@ function loadFoldersAndDocTypes(orgId) {
     // Reset Select2 & Tampilkan loading
     $('#folderSelect').html('<option value="">Loading folders...</option>').trigger('change');
     $('#documentTypeSelect').html('<option value="">Loading document types...</option>').trigger('change');
+    $('#divisionSelect').html('<option value="">Loading divisions...</option>').trigger('change');
+
+    $.ajax({
+        url: '/divisions/by-organization/' + orgId,
+        type: 'GET',
+        success: function (res) {
+            let options = '<option value="">-- Select Division --</option>';
+            if (res.length === 0) {
+                options = '<option value="">No divisions with users available</option>';
+            } else {
+                res.forEach(function (division) {
+                    options += `<option value="${division.id}">${division.division_name}</option>`;
+                });
+            }
+            $('#divisionSelect').html(options).trigger('change');
+        },
+        error: function () {
+            $('#divisionSelect').html('<option value="">Failed to load divisions</option>').trigger('change');
+        }
+    });
 
     // Load Folders
     $.ajax({

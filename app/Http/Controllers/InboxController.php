@@ -267,6 +267,12 @@ class InboxController extends Controller
             $folder = Folder::find($document->folder_id);
         }
 
+        $rejectionApproval = DocumentApproval::with('approver')
+            ->where('document_id', $document->id)
+            ->where('status', 'Rejected')
+            ->latest('completed_at')
+            ->first();
+
         // Tandai bahwa approver ini sudah membuka dokumen
         DocumentApproval::where('document_id', $document->id)
             ->where('approver_id', auth()->id())
@@ -274,7 +280,7 @@ class InboxController extends Controller
                 'flag_open' => true
             ]);
 
-        return view('inbox.preview', compact('document', 'folder'));
+        return view('inbox.preview', compact('document', 'folder', 'rejectionApproval'));
     }
 
     /**

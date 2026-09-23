@@ -26,7 +26,7 @@ class DivisionRequest extends FormRequest
                 'min:1',
                 'max:24',
                 'required',
-                'regex:/^[A-Za-z\s]+$/',
+                'regex:/^[A-Za-z\s\-\/&]+$/',
                 function ($attribute, $value, $fail) {
                     $exists = DB::table('divisions')
                         ->whereNull('deleted_at')

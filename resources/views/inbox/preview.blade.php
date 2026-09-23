@@ -119,17 +119,13 @@
                         </tr>
                     </table>
 
-                    @php
-                        $myApproval = $document->documentApprovals->first();
-                    @endphp
-
-@if($status == 'Rejected' && $myApproval)
+@if($status == 'Rejected' && $rejectionApproval)
     <div class="mt-3 pt-3 border-top">
         <strong class="text-danger">
-            Rejected By {{ optional($myApproval->approver)->name ?? 'Unknown User' }} - {{ optional($myApproval->updated_at)->format('d F Y H:i') }}
+            Rejected By {{ optional($rejectionApproval->approver)->name ?? 'Unknown User' }} - {{ optional($rejectionApproval->completed_at ?? $rejectionApproval->updated_at)->format('d F Y H:i') }}
         </strong>
         <p class="mb-0 text-muted small mt-1">
-            Reason: {{ $myApproval->remarks ?? '-' }}
+            Reason: {{ $rejectionApproval->remarks ?? '-' }}
         </p>
     </div>
 @endif

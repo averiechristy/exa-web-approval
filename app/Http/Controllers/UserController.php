@@ -57,20 +57,19 @@ class UserController extends Controller
             return response()->json([]);
         }
 
-        // cari parent role (order lebih kecil, paling dekat)
-        $parentRole = Role::where('role_level', '>', $role->role_level)
-            ->orderBy('role_level', 'desc')
-            ->first();
+        // Ambil semua role yang levelnya lebih tinggi dari user saat ini.
+        $parentRoleIds = Role::where('role_level', '>', $role->role_level)
+            ->pluck('id');
 
-        // kalau gak ada parent (top level)
-        if (!$parentRole) {
+        // User dengan role tertinggi tidak memiliki pilihan up line.
+        if ($parentRoleIds->isEmpty()) {
             return response()->json([]);
         }
 
         // ambil user yang sesuai di user_accesses
-        $managers = User::whereHas('userAccesses', function ($q) use ($divisionId, $parentRole, $organizationId) {
+        $managers = User::whereHas('userAccesses', function ($q) use ($divisionId, $parentRoleIds, $organizationId) {
             $q->where('division_id', $divisionId)
-            ->where('role_id', $parentRole->id);
+            ->whereIn('role_id', $parentRoleIds);
 
             // kalau ada organization_id, filter juga
             if ($organizationId) {

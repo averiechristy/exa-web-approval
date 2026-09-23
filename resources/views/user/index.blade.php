@@ -234,9 +234,9 @@
                                     <small class="text-danger"></small>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="small">Manager</label>
+                                    <label class="small">Up Line</label>
                                     <select name="organizations[0][manager_id]" class="form-control manager-select">
-                                        <option value="">Select Manager</option>
+                                        <option value="">Select Up Line</option>
                                     </select>
                                     <small class="text-danger"></small>
                                 </div>
@@ -445,7 +445,7 @@ $(document).on("click", ".btn-detail", function () {
                         <div class="ms-2 mb-2">
                             <div><b>Role:</b> ${item.role?.role_name ?? '-'}</div>
                             <div><b>Division:</b> ${item.division?.division_name ?? '-'}</div>
-                            <div><b>Manager:</b> ${item.manager?.name ?? '-'}</div>
+                            <div><b>Up Line:</b> ${item.manager?.name ?? '-'}</div>
                         </div>
                         <hr>
                     `;
@@ -594,9 +594,9 @@ $(document).ready(function() {
             success: function(data) {
                 managerSelect.empty();
                 if (data.length === 0) {
-                    managerSelect.append('<option value="">No Manager Available</option>');
+                    managerSelect.append('<option value="">No Up Line Available</option>');
                 } else {
-                    managerSelect.append('<option value="">Select Manager</option>');
+                    managerSelect.append('<option value="">Select Up Line</option>');
                     $.each(data, function(key, item) {
                         managerSelect.append(`<option value="${item.id}">${item.name}</option>`);
                     });
@@ -768,9 +768,9 @@ $(document).ready(function() {
                     <small class="text-danger"></small>
                 </div>
                 <div class="col-md-3">
-                    <label class="small">Manager</label>
+                    <label class="small">Up Line</label>
                     <select name="organizations[0][manager_id]" class="form-control manager-select">
-                        <option value="">Select Manager</option>
+                        <option value="">Select Up Line</option>
                     </select>
                     <small class="text-danger"></small>
                 </div>
@@ -857,7 +857,7 @@ $(document).ready(function() {
             @endforeach
             
             // ✅ BUILD MANAGER DROPDOWN DENGAN DATA YANG UDAH ADA
-            let managerOptions = `<option value="">Select Manager</option>`;
+            let managerOptions = `<option value="">Select Up Line</option>`;
             
             html += `
             <div class="row org-row mb-3 border-bottom pb-3" data-manager-id="${org.manager_id || ''}">
@@ -883,7 +883,7 @@ $(document).ready(function() {
                     <small class="text-danger"></small>
                 </div>
                 <div class="col-md-3">
-                    <label class="small">Manager</label>
+                    <label class="small">Up Line</label>
                     <select name="organizations[${index}][manager_id]" class="form-control manager-select">
                         ${managerOptions}
                     </select>
@@ -941,9 +941,9 @@ $(document).ready(function() {
                 <small class="text-danger"></small>
             </div>
             <div class="col-md-3">
-                <label class="small">Manager</label>
+                <label class="small">Up Line</label>
                 <select name="organizations[${index}][manager_id]" class="form-control manager-select">
-                    <option value="">Select Manager</option>
+                    <option value="">Select Up Line</option>
                 </select>
                 <small class="text-danger"></small>
             </div>
@@ -1073,10 +1073,10 @@ $(document).ready(function() {
             },
             success: function(data) {
                 managerSelect.empty();
-                managerSelect.append('<option value="">Select Manager</option>');
+                managerSelect.append('<option value="">Select Up Line</option>');
                 
                 if (data.length === 0) {
-                    managerSelect.append('<option value="">No Manager Available</option>');
+                    managerSelect.append('<option value="">No Up Line Available</option>');
                 } else {
                     $.each(data, function(key, item) {
                         let selected = (savedManagerId && item.id == savedManagerId) ? 'selected' : '';

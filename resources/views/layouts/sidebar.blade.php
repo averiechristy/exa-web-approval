@@ -5,7 +5,7 @@
 
 <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
 
-    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('dashboard.sla') }}">
+    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ $isSuperadmin ? route('dashboard') : route('dashboard.sla') }}">
         <div class="sidebar-brand-text mx-3">EXA E-APPROVAL</div>
     </a>
 

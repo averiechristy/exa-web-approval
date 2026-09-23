@@ -72,6 +72,7 @@ Route::middleware('auth')->group(function () {
     Route::get('upload', [UploadController::class, 'index'])->name('upload.index');
 
     Route::get('/folders/by-organization/{orgId}', [UploadController::class, 'getByOrganization']);
+    Route::get('/divisions/by-organization/{orgId}', [UploadController::class, 'getDivisionsByOrganization']);
     Route::get('/workflows/by-organization/{orgId}', [UploadController::class, 'getDocumentTypesByOrganization']);
 
     Route::get('/users/carboncopy', [UploadController::class, 'getCC'])->name('users.carboncopy');

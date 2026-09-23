@@ -30,6 +30,13 @@ class DocumentApproval extends Model
         'is_requester'
     ];
 
+    protected $casts = [
+        'approved_at' => 'datetime',
+        'started_at' => 'datetime',
+        'due_at' => 'datetime',
+        'completed_at' => 'datetime',
+    ];
+
     public function document()
     {
         return $this->belongsTo(Documents::class, 'document_id');

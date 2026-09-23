@@ -42,8 +42,8 @@ class UploadController extends Controller
                 $q->where('user_id', $user->id);
             })->get();
 
-        // DIVISION
-        $divisions = Division::all();
+        // Divisions are loaded after an organization is selected.
+        $divisions = collect();
     
 
         // FOLDER
@@ -73,6 +73,18 @@ class UploadController extends Controller
             'isSuperAdmin',
             'documentTypes'
         ));
+    }
+
+    public function getDivisionsByOrganization($orgId)
+    {
+        $divisions = Division::where('organization_id', $orgId)
+            ->whereHas('useraccess.user', function ($query) {
+                $query->where('is_active', true);
+            })
+            ->orderBy('division_name')
+            ->get(['id', 'division_name']);
+
+        return response()->json($divisions);
     }
 
     private function buildFolderOptions($folders, $prefix = '')
@@ -148,10 +160,19 @@ public function getWorkflowApprovers($workflowId, Request $request)
     $orgId = $request->organization_id;
     $requesterDivisionId = $request->division_id;   // division requester
     $currentUser = auth()->user();
-    $activeRoleId = session('active_role_id');
+    $activeRoleId = UserAccess::where('user_id', $currentUser->id)
+        ->where('organization_id', $orgId)
+        ->where('division_id', $requesterDivisionId)
+        ->value('role_id') ?? session('active_role_id');
 
-    $activeRoleLevel = Role::where('id', $activeRoleId)->value('role_level');
-    $highestRoleLevel = Role::max('role_level');
+    $activeRoleLevel = Role::whereKey($activeRoleId)->value('role_level');
+    $highestRoleLevel = Role::whereHas('useraccess', function ($query) use ($orgId, $requesterDivisionId) {
+        $query->where('organization_id', $orgId)
+            ->where('division_id', $requesterDivisionId)
+            ->whereHas('user', function ($userQuery) {
+                $userQuery->where('is_active', true);
+            });
+    })->max('role_level');
 
     // Ambil workflow steps
     $workflowSteps = WorkflowStep::with('division')
@@ -160,7 +181,9 @@ public function getWorkflowApprovers($workflowId, Request $request)
         ->get();
 
     $result = [];
-    $isRequesterHighestRole = ($activeRoleLevel == $highestRoleLevel);
+    $isRequesterHighestRole = $activeRoleLevel !== null
+        && $highestRoleLevel !== null
+        && $activeRoleLevel >= $highestRoleLevel;
 
     // ================== GROUP 1: Same Division - Higher Role ==================
     if (!$isRequesterHighestRole) {
@@ -207,7 +230,8 @@ public function getWorkflowApprovers($workflowId, Request $request)
             'sla_days'             => 0,
             'users'                => [],
             'is_same_division'     => true,
-            'is_requester_highest' => true   // Flag penting
+            'is_requester_highest' => true,
+            'is_optional'          => true
         ];
     }
 
@@ -275,6 +299,52 @@ public function getWorkflowApprovers($workflowId, Request $request)
             if (empty($uploadedFiles)) {
                 return response()->json(['message' => 'No files uploaded'], 422);
             }
+
+            $documentApprovals = $payload['document_approvals'] ?? [];
+            $documentNames = collect($payload['files'] ?? [])
+                ->pluck('name')
+                ->map(fn ($name) => mb_strtolower(trim((string) $name)))
+                ->filter();
+
+            if ($documentNames->count() !== $documentNames->unique()->count()) {
+                return response()->json(['message' => 'Document names must be unique.'], 422);
+            }
+
+            if (Documents::whereIn(DB::raw('LOWER(document_name)'), $documentNames->values()->all())->exists()) {
+                return response()->json(['message' => 'A document with the same name already exists.'], 422);
+            }
+
+            $approverIds = collect($documentApprovals)
+                ->pluck('approver_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id);
+
+            if ($approverIds->count() !== $approverIds->unique()->count()) {
+                return response()->json(['message' => 'The same person cannot approve a document in multiple tiers.'], 422);
+            }
+
+            $organizationId = $payload['document']['organization_id'] ?? null;
+            $requesterDivisionId = $payload['document']['requester_division_id'] ?? null;
+            $activeRoleId = UserAccess::where('user_id', auth()->id())
+                ->where('organization_id', $organizationId)
+                ->where('division_id', $requesterDivisionId)
+                ->value('role_id') ?? session('active_role_id');
+            $activeRoleLevel = Role::whereKey($activeRoleId)->value('role_level');
+            $highestRoleLevel = Role::whereHas('useraccess', function ($query) use ($organizationId, $requesterDivisionId) {
+                $query->where('organization_id', $organizationId)
+                    ->where('division_id', $requesterDivisionId)
+                    ->whereHas('user', fn ($userQuery) => $userQuery->where('is_active', true));
+            })->max('role_level');
+            $isRequesterHighestRole = $activeRoleLevel !== null
+                && $highestRoleLevel !== null
+                && $activeRoleLevel >= $highestRoleLevel;
+            $hasTierZeroApprover = collect($documentApprovals)
+                ->contains(fn ($approval) => (int) ($approval['tier'] ?? -1) === 0 && !($approval['is_requester'] ?? false));
+
+            if (!$isRequesterHighestRole && !$hasTierZeroApprover) {
+                return response()->json(['message' => 'Tier 0 requires at least one approver.'], 422);
+            }
+
             DB::beginTransaction();
 
             $folderName = 'documents/' . date('Y/m/d');

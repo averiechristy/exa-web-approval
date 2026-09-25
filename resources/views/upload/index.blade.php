@@ -522,7 +522,7 @@ function renderSignerListFromStep2() {
         const xPercent = parseFloat((xPx / rect.width).toFixed(4));
         const yPercent = parseFloat((yPx / rect.height).toFixed(4));
 
-        console.log(`📍 Drop Position - Page ${currentPage}: ${xPercent}%, ${yPercent}%`);
+        console.log(`📍 Drop Position - Page ${currentPage}: ${xPercent}, ${yPercent}`);
 
         const signatureData = {
             signer_id: draggedSigner.id,
@@ -567,9 +567,14 @@ function renderSignerListFromStep2() {
     });
 
     function positionSignatureBoxAtCanvas(box, xPx, yPx) {
+        const canvasRect = pdfCanvas.getBoundingClientRect();
+        const areaRect = pdfArea.getBoundingClientRect();
+        const canvasOffsetX = canvasRect.left - areaRect.left + pdfArea.scrollLeft;
+        const canvasOffsetY = canvasRect.top - areaRect.top + pdfArea.scrollTop;
+
         box.style.position = 'absolute';
-        box.style.left = `${xPx}px`;
-        box.style.top = `${yPx}px`;
+        box.style.left = `${canvasOffsetX + xPx}px`;
+        box.style.top = `${canvasOffsetY + yPx}px`;
         box.style.zIndex = 100;
         box.style.transform = 'none';
     }
@@ -599,18 +604,20 @@ function renderSignerListFromStep2() {
         let newTop = originalTop + dy;
 
         const rect = pdfCanvas.getBoundingClientRect();
-        const pdfAreaRect = pdfArea.getBoundingClientRect();
+        const areaRect = pdfArea.getBoundingClientRect();
+        const canvasOffsetX = rect.left - areaRect.left + pdfArea.scrollLeft;
+        const canvasOffsetY = rect.top - areaRect.top + pdfArea.scrollTop;
 
         // Boundary check
-        newLeft = Math.max(10, Math.min(newLeft, rect.width - box.offsetWidth - 10));
-        newTop = Math.max(10, Math.min(newTop, rect.height - box.offsetHeight - 40));
+        const localLeft = Math.max(10, Math.min(newLeft - canvasOffsetX, rect.width - box.offsetWidth - 10));
+        const localTop = Math.max(10, Math.min(newTop - canvasOffsetY, rect.height - box.offsetHeight - 40));
 
-        box.style.left = (newLeft) + 'px';
-        box.style.top = (newTop) + 'px';
+        box.style.left = (canvasOffsetX + localLeft) + 'px';
+        box.style.top = (canvasOffsetY + localTop) + 'px';
 
         // Update percentage (sinkron dengan backend)
-        const xPercent = parseFloat((newLeft / rect.width).toFixed(4));
-        const yPercent = parseFloat((newTop / rect.height).toFixed(4));
+        const xPercent = parseFloat((localLeft / rect.width).toFixed(4));
+        const yPercent = parseFloat((localTop / rect.height).toFixed(4));
 
         const file = uploadedFiles[parseInt(box.dataset.fileIndex || activeFileIndex)];
         if (file) {
@@ -1728,8 +1735,8 @@ function renderRequesterSection() {
         fileData.signatures = file.signatures.map(sig => ({
             approver_id: sig.signer_id,
             page_number: sig.page,
-            pos_x_percent: parseFloat(sig.x_percent.toFixed(2)),
-            pos_y_percent: parseFloat((sig.y_percent).toFixed(2)),
+            pos_x_percent: parseFloat(Number(sig.x_percent).toFixed(4)),
+            pos_y_percent: parseFloat(Number(sig.y_percent).toFixed(4)),
             tier: sig.tier,
             mode: 'custom' 
         }));

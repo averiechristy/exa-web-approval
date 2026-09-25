@@ -390,7 +390,7 @@ class InboxController extends Controller
                             $x = $pageWidth - $textWidth - 5;
                         }
 
-                        $pdf->Text($x, $y, $textToInsert);
+                        $pdf->Write(0, $textToInsert);
                     }
                 }
 

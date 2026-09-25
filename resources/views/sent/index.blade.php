@@ -10,6 +10,19 @@
         box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
     }
 
+    .share-user-row {
+        align-items: center;
+    }
+
+    .share-user-row .select2-container {
+        flex: 1 1 auto;
+        width: auto !important;
+    }
+
+    .share-user-row .btn-remove-user {
+        height: 38px;
+    }
+
     .select2-container {
         width: 100% !important;
     }
@@ -446,7 +459,7 @@
 
                     <div id="userContainer">
 
-                        <div class="user-row d-flex mb-2">
+                        <div class="user-row share-user-row d-flex mb-2">
 
                             <select class="form-control user-select"
                                     name="user_ids[]">
@@ -685,7 +698,7 @@ $('.btn-share-document').click(function () {
     $('#share_document_id').val($(this).data('document-id'));
 
     $('#userContainer').html(`
-        <div class="user-row d-flex mb-2">
+        <div class="user-row share-user-row d-flex mb-2">
 
             <select class="form-control user-select" name="user_ids[]">
 
@@ -708,16 +721,32 @@ $('.btn-share-document').click(function () {
         </div>
     `);
 
+    initializeShareUserSelect($('#userContainer .user-select'));
     $('#shareDocumentModal').modal('show');
 });
-$('#addUserBtn').click(function () {
 
-    let row = $('.user-row:first').clone();
+function initializeShareUserSelect(select) {
+    $(select).select2({
+        theme: 'bootstrap4',
+        placeholder: 'Search user...',
+        allowClear: true,
+        width: '100%',
+        dropdownParent: $('#shareDocumentModal')
+    });
+}
+
+$('#addUserBtn').click(function () {
+    const sourceSelect = $('#userContainer .user-select').first();
+
+    sourceSelect.select2('destroy');
+    const row = sourceSelect.closest('.user-row').clone();
+    initializeShareUserSelect(sourceSelect);
 
     row.find('select').val('');
     row.find('.btn-remove-user').show();
 
     $('#userContainer').append(row);
+    initializeShareUserSelect(row.find('.user-select'));
 });
 
 $(document).on('click', '.btn-remove-user', function () {

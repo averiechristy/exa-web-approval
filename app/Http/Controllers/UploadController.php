@@ -574,7 +574,6 @@ public function getWorkflowApprovers($workflowId, Request $request)
             $size = $pdf->getTemplateSize($tplId);
             $pageWidth = $size['width'];
             $pageHeight = $size['height'];
-            $paddingY = 2;
             $textToInsert = "Requested by {$approver->name}";
 
             $positions = collect($payload['file_positions'][$fileIndex]['signatures'] ?? [])
@@ -584,7 +583,7 @@ public function getWorkflowApprovers($workflowId, Request $request)
                 if ((int)$pos['page_number'] !== $pageNo) continue;
 
                 $x = $pos['pos_x_percent'] * $pageWidth;
-                $y = ($pos['pos_y_percent'] * $pageHeight) + $paddingY;
+                $y = $pos['pos_y_percent'] * $pageHeight;
 
                 $pdf->SetFont('helvetica', 'B', 11);
                 $pdf->SetTextColor(0, 128, 0);
@@ -596,7 +595,7 @@ public function getWorkflowApprovers($workflowId, Request $request)
                     $x = $pageWidth - $textWidth - 5;
                 }
 
-                $pdf->Text($x, $y, $textToInsert);
+                $pdf->Write(0, $textToInsert);
             }
         }
 

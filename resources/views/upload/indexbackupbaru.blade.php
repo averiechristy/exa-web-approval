@@ -132,7 +132,7 @@
 
             <!-- ================= APPROVERS ================= -->
             <h5 class="font-weight-bold text-primary mb-4">
-                <i class="fas fa-users mr-2"></i> Approver List
+                <i class="fas fa-users mr-2"></i> Bulk Approver List
             </h5>
             
             <div id="tierContainer" class="mb-5">

@@ -83,6 +83,13 @@
 @section('content')
 <div class="container-fluid">
             <h1 class="h3 mb-4 text-gray-800">Shared Document</h1>
+            <div class="d-flex justify-content-between mb-3">
+    <div>
+        <button class="btn btn-success" id="bulkExportBtn" disabled>
+            <i class="fas fa-file-export"></i> Bulk Download
+        </button>
+    </div>
+</div>
 
 <!-- 
     @if(session('success'))
@@ -176,7 +183,15 @@
                                 </td>
                                 <td>
                                     
-                                        <span class="badge badge-warning">{{$document->status}}</span>
+                                       <span class="badge
+                                        @if($document->status == 'Approved') badge-success
+                                        @elseif($document->status == 'Rejected') badge-danger
+                                        @elseif($document->status == 'In Progress' || $document->status == 'In Progrress') badge-info
+                                        @elseif($document->status == 'Need Approval') badge-warning
+                                        @else badge-secondary
+                                        @endif">
+                                        {{ $document->status }}
+                                    </span>
                                 </td>
                                 <td>{{ $document->updated_at->format('d M Y, H:i') }}</td>
                                 <td>

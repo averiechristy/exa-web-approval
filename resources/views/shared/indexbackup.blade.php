@@ -83,10 +83,10 @@
         <div class="d-flex justify-content-between mb-3">
             <div>
                 <button class="btn btn-success mr-2" id="bulkExportBtn" disabled>
-                    <i class="fas fa-file-export"></i> Export
+                    <i class="fas fa-file-export"></i>  Bulk Download
                 </button>
                 <button class="btn btn-primary" id="bulkApproveBtn" disabled>
-                    <i class="fas fa-check-circle"></i> Approve
+                    <i class="fas fa-check-circle"></i> Bulk Approve
                 </button>
             </div>
 

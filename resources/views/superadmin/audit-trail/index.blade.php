@@ -1,17 +1,41 @@
 @extends('layouts.app')
 
+@push('styles')
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<!-- Select2 Bootstrap 4 Theme CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@1.5.2/dist/select2-bootstrap4.min.css">
+
+<style>
+    /* Menyesuaikan tinggi Select2 agar sejajar dengan input form-control-sm lainnya */
+    .select2-container--bootstrap4 .select2-selection--single {
+        height: calc(1.5em + 0.5rem + 2px) !important;
+        padding: 0.25rem 0.5rem !important;
+        font-size: 0.875rem !important;
+    }
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+        line-height: 1.5 !important;
+        padding-left: 0 !important;
+    }
+    .select2-container--bootstrap4 .select2-selection--single .select2-selection__placeholder {
+        line-height: 1.5 !important;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="container-fluid">
     <h1 class="h3 mb-2 text-gray-800">System Activity History</h1>
     <p class="mb-4">Track user activities, document updates, and data changes across the platform.</p>
-
-    <!-- Filter Cards -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Search & Filter</h6>
-        </div>
-        <div class="card-body">
-            <form action="{{ route('audit-trail.index') }}" method="GET" class="row">
+<!-- Filter Cards -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+        <h6 class="m-0 font-weight-bold text-primary">Search & Filter</h6>
+    </div>
+    <div class="card-body">
+        <form action="{{ route('audit-trail.index') }}" method="GET">
+            <div class="row align-items-end">
+                <!-- Module / Feature -->
                 <div class="col-md-3 mb-3">
                     <label class="small font-weight-bold text-gray-600">Module / Feature</label>
                     <select name="log_name" class="form-control form-control-sm">
@@ -21,20 +45,59 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3 mb-3">
+
+                <!-- Action Type -->
+                <div class="col-md-2 mb-3">
                     <label class="small font-weight-bold text-gray-600">Action Type</label>
-                    <input type="text" name="event" value="{{ request('event') }}" placeholder="e.g. document.rejected" class="form-control form-control-sm">
+                    <select name="event" class="form-control form-control-sm">
+                        <option value="">-- All Actions --</option>
+                        @foreach($events as $evt)
+                            <option value="{{ $evt }}" {{ request('event') == $evt ? 'selected' : '' }}>
+                                {{ ucfirst($evt) }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
-                <div class="col-md-4 mb-3">
-                    <label class="small font-weight-bold text-gray-600">Keyword Search</label>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by document name, org, or description..." class="form-control form-control-sm">
+
+<!-- User / Performed By -->
+<div class="col-md-3 mb-3">
+    <label class="small font-weight-bold text-gray-600">User / Performed By</label>
+    <!-- Hapus 'form-control form-control-sm', sisakan class 'select2' saja -->
+    <select name="causer_id" id="user-select" class="form-control select2">
+        <option value="">-- All Users --</option>
+        @foreach($users as $user)
+            <option value="{{ $user->id }}" {{ request('causer_id') == $user->id ? 'selected' : '' }}>
+                {{ $user->name }}
+            </option>
+        @endforeach
+    </select>
+</div>
+
+                <!-- Start Date -->
+                <div class="col-md-2 mb-3">
+                    <label class="small font-weight-bold text-gray-600">Start Date</label>
+                    <input type="date" name="start_date" value="{{ request('start_date') }}" class="form-control form-control-sm">
                 </div>
-                <div class="col-md-2 mb-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary btn-sm btn-block"><i class="fas fa-filter fa-sm"></i> Apply Filter</button>
+
+                <!-- End Date -->
+                <div class="col-md-2 mb-3">
+                    <label class="small font-weight-bold text-gray-600">End Date</label>
+                    <input type="date" name="end_date" value="{{ request('end_date') }}" class="form-control form-control-sm">
                 </div>
-            </form>
-        </div>
+
+                <!-- Action Buttons -->
+                <div class="col-md-12 text-right">
+                    <a href="{{ route('audit-trail.index') }}" class="btn btn-secondary btn-sm mr-1">
+                        <i class="fas fa-undo fa-sm"></i> Reset Filter
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-filter fa-sm"></i> Apply Filter
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
+</div>
 
     <!-- Data Table -->
     <div class="card shadow mb-4">
@@ -148,8 +211,21 @@
 @endsection
 
 @push('scripts')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+
+$(document).ready(function() {
+    $('#user-select').select2({
+        theme: 'bootstrap4',
+        placeholder: '-- All Users --',
+        allowClear: true,
+        width: '100%'
+    });
+});
         document.body.addEventListener('click', function (event) {
             const button = event.target.closest('.view-details');
             

@@ -519,29 +519,11 @@ class InboxController extends Controller
         }
     }
 
-    public function bulkApprove(Request $request)
-    {
+public function bulkApprove(Request $request)
+{
+    try {
         $documentIds = $request->input('document_ids', []);
-    $documents = Document::whereIn('id', $documentIds)->get();
 
-    $invalidDocs = [];
-
-    foreach ($documents as $doc) {
-        if ($doc->status === 'Approved') {
-            $invalidDocs[] = "<strong>{$doc->document_name}</strong>: Document Status Already Approved";
-        } elseif ($doc->status === 'Rejected') {
-            $invalidDocs[] = "<strong>{$doc->document_name}</strong>: Document Status Already Rejected";
-        }
-    }
-
-    if (count($invalidDocs) > 0) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Some documents could not be approved.',
-            'invalid_documents' => $invalidDocs
-        ], 422);
-    }
-        
         if (empty($documentIds)) {
             return response()->json([
                 'success' => false,
@@ -549,20 +531,33 @@ class InboxController extends Controller
             ], 400);
         }
 
+        // 1. Menggunakan model Documents (sesuai import use App\Models\Documents)
+        $documents = Documents::whereIn('id', $documentIds)->get();
+
+        // 2. Validasi status dokumen
+        $invalidDocs = [];
+        foreach ($documents as $doc) {
+            if ($doc->status === 'Approved') {
+                $invalidDocs[] = "<strong>{$doc->document_name}</strong>: Document Status Already Approved";
+            } elseif ($doc->status === 'Rejected') {
+                $invalidDocs[] = "<strong>{$doc->document_name}</strong>: Document Status Already Rejected";
+            }
+        }
+
+        if (count($invalidDocs) > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Some documents could not be approved.',
+                'invalid_documents' => $invalidDocs
+            ], 422);
+        }
+
         $approver = auth()->user();
 
-        // === CEK SEMUA DOKUMEN DULU ===
+        // 3. Validasi apakah semua dokumen sudah dibuka (flag_open)
         $invalidDocuments = [];
-        
-        foreach ($documentIds as $id) {
-            $document = Documents::find($id);
-
-            if (!$document) {
-                $invalidDocuments[] = "Document ID {$id} not found.";
-                continue;
-            }
-
-            $documentApproval = DocumentApproval::where('document_id', $id)
+        foreach ($documents as $document) {
+            $documentApproval = DocumentApproval::where('document_id', $document->id)
                 ->where('approver_id', $approver->id)
                 ->first();
 
@@ -581,48 +576,46 @@ class InboxController extends Controller
             ], 422);
         }
 
-        // === Jika semua sudah dibuka, lanjut proses ===
+        // 4. Lanjut proses approval jika semua syarat terpenuhi
         $results = [
             'success' => [],
             'failed'  => []
         ];
 
-        foreach ($documentIds as $id) {
+        foreach ($documents as $document) {
             try {
-                $document = Documents::findOrFail($id);
-
-                $documentApproval = DocumentApproval::where('document_id', $id)
+                $documentApproval = DocumentApproval::where('document_id', $document->id)
                     ->where('approver_id', $approver->id)
                     ->first();
 
                 if (!$documentApproval || $documentApproval->status !== 'Pending') {
                     $results['failed'][] = [
-                        'id' => $id,
+                        'id' => $document->id,
                         'name' => $document->document_name,
                         'reason' => 'No Pending approval for you'
                     ];
                     continue;
                 }
 
-                $approvalResult = $this->processSingleApproval($document, $documentApproval, $approver, $id);
+                $approvalResult = $this->processSingleApproval($document, $documentApproval, $approver, $document->id);
 
                 if ($approvalResult['success']) {
                     $results['success'][] = [
-                        'id' => $id,
+                        'id' => $document->id,
                         'name' => $document->document_name,
                         'status' => $approvalResult['document_status']
                     ];
                 } else {
                     $results['failed'][] = [
-                        'id' => $id,
+                        'id' => $document->id,
                         'name' => $document->document_name,
                         'reason' => $approvalResult['message']
                     ];
                 }
 
             } catch (\Exception $e) {
-                \Log::error("Bulk Approve Error - Doc ID {$id}: " . $e->getMessage());
-                $results['failed'][] = ['id' => $id, 'reason' => $e->getMessage()];
+                \Log::error("Bulk Approve Error - Doc ID {$document->id}: " . $e->getMessage());
+                $results['failed'][] = ['id' => $document->id, 'reason' => $e->getMessage()];
             }
         }
 
@@ -631,7 +624,17 @@ class InboxController extends Controller
             'message' => "Bulk approve completed. Success: " . count($results['success']) . ", Failed: " . count($results['failed']),
             'results' => $results
         ]);
+
+    } catch (\Exception $e) {
+        \Log::error("Fatal Bulk Approve Error: " . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Server error occurred while processing bulk approval.',
+            'error'   => $e->getMessage()
+        ], 500);
     }
+}
     private function processSingleApproval($document, $documentApproval, $approver, $id)
     {
         $approvalTime = now()->format('d F Y H:i');

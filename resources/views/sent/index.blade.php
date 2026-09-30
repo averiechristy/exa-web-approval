@@ -2,6 +2,14 @@
 @section('title', 'Sent')
 
 <style>
+    input[type="date"].form-control-sm {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+.form-label {
+    display: inline-block;
+    margin-bottom: 0.35rem !important;
+}
     .hover-shadow {
         transition: all 0.25s ease;
     }
@@ -144,77 +152,89 @@
         <div class="d-flex justify-content-between mb-3">
             <div>
                 <button class="btn btn-success mr-2" id="bulkExportBtn" disabled>
-                    <i class="fas fa-file-export"></i> Export
+                    <i class="fas fa-file-export"></i> Bulk Download
                 </button>
-                <button class="btn btn-primary" id="bulkApproveBtn" disabled>
-                    <i class="fas fa-check-circle"></i> Approve
-                </button>
+                <!-- <button class="btn btn-primary" id="bulkApproveBtn" disabled>
+                    <i class="fas fa-check-circle"></i> Bulk Approve
+                </button> -->
             </div>
 
         </div>
     <!-- Filter -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <form method="GET" action="{{ route('sent.index') }}">
-                    <div class="row align-items-end">
-                        <div class="col-md-3">
-                            <label class="small font-weight-bold">Document Name</label>
-                            <input type="text" id="searchInput" name="search" class="form-control form-control-sm" placeholder="Search document name..." value="{{ request('search') }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small font-weight-bold">Status</label>
-                            <select class="form-control form-control-sm" name="status">
-                                <option value="">All Status</option>
-                                <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
-                                <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
-                                <option value="Approved" {{ request('status') == 'Approved' ? 'selected' : '' }}>Approved</option>
-                                <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="small font-weight-bold">Requester</label>
-                            <select class="form-control form-control-sm select2" id="requesterSelect" name="requester_id">
-                                <option value="">All Requesters</option>
-                                @foreach($userOptions as $user)
-                                    <option value="{{ $user->id }}" {{ request('requester_id') == $user->id ? 'selected' : '' }}>
-                                        {{ $user->name }} ({{ $user->username }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="small font-weight-bold">Addressee</label>
-                            <select class="form-control form-control-sm select2" id="addresseeSelect" name="addressee_id">
-                                <option value="">All Addressees</option>
-                                @foreach($addresseeOptions as $user)
-                                    <option value="{{ $user->id }}" {{ request('addressee_id') == $user->id ? 'selected' : '' }}>
-                                        {{ $user->name }} ({{ $user->username }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small font-weight-bold">From</label>
-                            <input type="date" class="form-control form-control-sm" name="from_date" value="{{ request('from_date') }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="small font-weight-bold">To</label>
-                            <input type="date" class="form-control form-control-sm" name="to_date" value="{{ request('to_date') }}">
-                        </div>
-                        <div class="col-12 text-right mt-3">
-                            <div class="d-flex">
-                                <button class="btn btn-primary btn-sm mr-1" type="submit">
-                                    <i class="fas fa-filter"></i> Apply Filter
-                                </button>
-                                <a href="{{ route('sent.index') }}" class="btn btn-secondary btn-sm">
-                                    <i class="fas fa-undo"></i> Reset
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </form>
+<!-- Filter -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ route('sent.index') }}">
+            <div class="row g-3 align-items-end">
+                <!-- Document Name -->
+                <div class="col-lg-3 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-2">Document Name</label>
+                    <input type="text" id="searchInput" name="search" class="form-control form-control-sm" placeholder="Search document name..." value="{{ request('search') }}">
+                </div>
+
+                <!-- Status -->
+                <div class="col-lg-2 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-2">Status</label>
+                    <select class="form-control form-control-sm" name="status">
+                        <option value="">All Status</option>
+                        <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
+                        <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
+                        <option value="Approved" {{ request('status') == 'Approved' ? 'selected' : '' }}>Approved</option>
+                        <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
+                    </select>
+                </div>
+
+                <!-- Requester -->
+                <div class="col-lg-3 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-2">Requester</label>
+                    <select class="form-control form-control-sm select2" id="requesterSelect" name="requester_id">
+                        <option value="">All Requesters</option>
+                        @foreach($userOptions as $user)
+                            <option value="{{ $user->id }}" {{ request('requester_id') == $user->id ? 'selected' : '' }}>
+                                {{ $user->name }} ({{ $user->username }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Addressee -->
+                <div class="col-lg-4 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-2">Addressee</label>
+                    <select class="form-control form-control-sm select2" id="addresseeSelect" name="addressee_id">
+                        <option value="">All Addressees</option>
+                        @foreach($addresseeOptions as $user)
+                            <option value="{{ $user->id }}" {{ request('addressee_id') == $user->id ? 'selected' : '' }}>
+                                {{ $user->name }} ({{ $user->username }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- From Date -->
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label small font-weight-bold text-muted mb-2">From</label>
+                    <input type="date" class="form-control form-control-sm px-2" name="from_date" value="{{ request('from_date') }}">
+                </div>
+
+                <!-- To Date -->
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label small font-weight-bold text-muted mb-2">To</label>
+                    <input type="date" class="form-control form-control-sm px-2" name="to_date" value="{{ request('to_date') }}">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="col-lg-8 col-md-6 col-12 text-end mt-3">
+                    <button class="btn btn-primary btn-sm me-1" type="submit">
+                        <i class="fas fa-filter me-1"></i> Apply Filter
+                    </button>
+                    <a href="{{ route('sent.index') }}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-undo me-1"></i> Reset
+                    </a>
+                </div>
             </div>
-        </div>
+        </form>
+    </div>
+</div>
         
         <!-- Documents -->
         <div class="card shadow mb-4">
@@ -509,8 +529,10 @@
 </div>
 
 <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
+@push('scripts')
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
 $('#requesterSelect, #addresseeSelect').select2({
     theme: 'bootstrap4',
@@ -693,7 +715,7 @@ $('#folderSearchInput').on('keyup', function () {
     }, 500);
 });
 
-$('.btn-share-document').click(function () {
+$(document).on('click', '.btn-share-document', function () {
 
     $('#share_document_id').val($(this).data('document-id'));
 
@@ -796,4 +818,5 @@ $('#shareForm').submit(function (e) {
     }
 });
 </script>
+@endpush
 @endsection

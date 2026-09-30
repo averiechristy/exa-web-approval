@@ -46,13 +46,24 @@
                         @forelse($documents as $document)
                             <tr>
                                 <td>{{ $document->document_name }}</td>
-                                <td><span class="badge badge-{{ $document->status === 'Approved' ? 'success' : ($document->status === 'Cancelled' ? 'dark' : 'secondary') }}">{{ $document->status }}</span></td>
+                                <td><span class="badge
+                @if($document->status == 'Approved') badge-success
+                @elseif($document->status == 'Rejected') badge-danger
+                @elseif($document->status == 'In Progress' || $document->status == 'In Progrress') badge-info
+                @elseif($document->status == 'Need Approval') badge-warning
+                @else badge-secondary
+                @endif">
+                {{ $document->status }}
+            </span>
+        </td>
                                 <td>{{ $document->requester?->name ?? '-' }}</td>
                                 <td>{{ $document->folder?->folder_name ?? '-' }}</td>
                                 <td>{{ $document->updated_at?->format('d M Y, H:i') }}</td>
                                 <td class="text-center">
                                     <a href="{{ route('superadmin.documents.preview', $document) }}" class="btn btn-sm btn-light" title="View"><i class="fas fa-eye text-secondary"></i></a>
-                                    @if($document->status !== 'Cancelled')
+                                    
+                                    {{-- Hanya tampilkan tombol void jika status Need Approval, In Progress, atau Approved --}}
+                                    @if(in_array($document->status, ['Need Approval', 'In Progress', 'Approved']))
                                         <form method="POST" action="{{ route('superadmin.documents.void', $document) }}" class="d-inline void-document-form">
                                             @csrf
                                             <button type="submit" class="btn btn-sm btn-light" title="Void"><i class="fas fa-ban text-danger"></i></button>

@@ -357,33 +357,44 @@
     });
     
     // ================= STEP NAVIGATION =================
-    function updateStep() {
-        contents.forEach((c, i) => {
-            c.classList.remove('active');
-            steps[i].classList.remove('active', 'completed');
+function updateStep() {
+    contents.forEach((c, i) => {
+        c.classList.remove('active');
+        steps[i].classList.remove('active', 'completed');
 
-            if (i < currentStep) {
-                steps[i].classList.add('completed');
-            } else if (i === currentStep) {
-                steps[i].classList.add('active');
-            }
-        });
+        if (i < currentStep) {
+            steps[i].classList.add('completed');
+        } else if (i === currentStep) {
+            steps[i].classList.add('active');
+        }
+    });
 
-        contents[currentStep].classList.add('active');
+    contents[currentStep].classList.add('active');
 
-        // Step 3: Render dynamic signers dari Step 2
-        if (currentStep === 2 && uploadedFiles.length > 0) {
-            if (!pdfRendered) {
-                renderPDF();
-                pdfRendered = true;
-            }
-            
-            renderSignerListFromStep2();
-            
-            // Re-render signatures untuk current page
+    // ================= SCRIPT KHUSUS STEP 3 =================
+    if (currentStep === 2 && uploadedFiles.length > 0) {
+        if (!pdfRendered) {
+            renderPDF();
+            pdfRendered = true;
+        }
+        
+        // 1. Render ulang list orang di panel kiri
+        renderSignerListFromStep2();
+
+        // 2. Cek tipe placement yang sedang terpilih saat ini
+        const currentPlacement = document.querySelector('input[name="placementType"]:checked')?.value || 'custom';
+        
+        // 3. JIKA BUKAN CUSTOM (Fixed / Standard) -> PAKSA KUNCI PANEL KIRI!
+        if (currentPlacement !== 'custom') {
+            disableSignerPanel();
+            applyStandardFixedSignatures(currentPlacement);
+        } else {
+            // Jika Custom baru jalankan render posisi visual drag & drop
             renderSignaturesForPage(currentPage);
+            updateSignerUIForCurrentFile();
         }
     }
+}
 
     // ================= DYNAMIC SIGNER LIST FROM STEP 2 =================
     // ================= DYNAMIC SIGNER LIST FROM STEP 2 =================
@@ -2006,13 +2017,15 @@ function collectStep2Data() {
         updateSignerUIForCurrentFile();
     }
 
-    function disableSignerPanel() {
-        document.querySelectorAll('.signer-item').forEach(item => {
-            item.style.opacity = 0.5;
-            item.style.pointerEvents = 'none';
-            item.classList.add('disabled');
-        });
-    }
+function disableSignerPanel() {
+    // Kunci seluruh item signer di panel kiri
+    document.querySelectorAll('#dynamicSignerList .signer-item').forEach(item => {
+        item.classList.add('disabled');
+        item.style.opacity = '0.35';
+        item.style.pointerEvents = 'none'; // Mematikan klik & drag
+        item.setAttribute('draggable', 'false'); // Matikan atribut draggable HTML5
+    });
+}
 
 
 

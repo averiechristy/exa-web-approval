@@ -657,12 +657,13 @@ $(document).on('click', '.removeEditWorkflow', function () {
         // reset isi row pertama
         firstRow.find('.division-select').val('').removeClass('is-invalid');
         firstRow.find('.slaInput').val('');
+        firstRow.find('.role-select').val('').removeClass('is-invalid');
 
         // reset tier
         firstRow.find('.tierInput').val(1);
     }
 
-    function renderEditSteps(steps) {
+function renderEditSteps(steps) {
     $("#editWorkflowContainer").html('');
 
     steps.forEach((step, index) => {
@@ -670,8 +671,8 @@ $(document).on('click', '.removeEditWorkflow', function () {
         let row = `
             <div class="form-row align-items-end workflow-row mb-3">
 
-                <div class="col-md-2">
-                <label>Tier</label>
+                <div class="col-md-1">
+                    <label>Tier</label>
                     <input type="number"
                         class="form-control"
                         name="steps[${index}][tier]"
@@ -679,8 +680,8 @@ $(document).on('click', '.removeEditWorkflow', function () {
                         readonly>
                 </div>
 
-                <div class="col-md-5">
-                <label>Division</label>
+                <div class="col-md-3">
+                    <label>Division</label>
                     <select class="form-control"
                         name="steps[${index}][division_id]">
                         @foreach($divisions as $div)
@@ -693,11 +694,25 @@ $(document).on('click', '.removeEditWorkflow', function () {
                 </div>
 
                 <div class="col-md-3">
-                <label>SLA (Days)</label>
+                    <label>SLA (Days)</label>
                     <input type="number"
                         class="form-control"
                         name="steps[${index}][sla_days]"
                         value="${step.sla_days ?? ''}">
+                </div>
+
+                <div class="col-md-3">
+                    <label>Min Role</label>
+                    <select class="form-control"
+                        name="steps[${index}][min_role_level]">
+                        <option value="">Select Role</option>
+                        @foreach($roles as $role)
+                            <option value="{{ $role->role_level }}"
+                                ${step.min_role_level == {{ $role->role_level }} ? 'selected' : ''}>
+                                {{ $role->role_name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="col-md-2">
@@ -771,72 +786,82 @@ $('#editWorkflowForm').on('submit', function (e) {
 
     let organization = $('#editOrganizationId').val();
 
-    // =====================
-    // VALIDASI ORGANIZATION
-    // =====================
+    // Validasi Organization
     if (!organization) {
         errorOrg.text('Organization is required');
         $('#editOrganizationId').addClass('is-invalid');
         isValid = false;
     }
 
-    // =====================
-    // VALIDASI DOCUMENT TYPE
-    // =====================
+    // Validasi Document Type
     if (documentType.length < 1) {
         errorDoc.text('Document Type is required');
         $('#editDocumentType').addClass('is-invalid');
         isValid = false;
     }
 
-    // =====================
-    // VALIDASI DIVISION
-    // =====================
+    // Validasi Each Row (Division, SLA, Min Role)
     let divisions = [];
-    let hasDivision = false;
+    let rows = $('#editWorkflowContainer .workflow-row');
 
-    $('#editWorkflowContainer .workflow-row').each(function () {
-        let division = $(this).find('select[name*="[division_id]"]').val();
-
-        if (division) {
-            hasDivision = true;
-            divisions.push(division);
-        }
-    });
-
-    if (!hasDivision) {
-        errorDivision.text('At least 1 approval division is required');
+    if (rows.length === 0) {
+        errorDivision.text('At least 1 approval division is required.');
         isValid = false;
     }
 
-    // =====================
-    // DUPLICATE CHECK
-    // =====================
-    let duplicate = divisions.some((item, index) => divisions.indexOf(item) !== index);
+    rows.each(function () {
+        let divisionSelect = $(this).find('select[name*="[division_id]"]');
+        let slaInput = $(this).find('input[name*="[sla_days]"]');
+        let roleSelect = $(this).find('select[name*="[min_role_level]"]');
 
+        let divisionVal = divisionSelect.val();
+        let slaVal = slaInput.val().trim();
+        let roleVal = roleSelect.val();
+
+        if (!divisionVal) {
+            divisionSelect.addClass('is-invalid');
+            isValid = false;
+        } else {
+            divisions.push(divisionVal);
+        }
+
+        if (!slaVal || parseInt(slaVal) <= 0) {
+            slaInput.addClass('is-invalid');
+            isValid = false;
+        }
+
+        if (!roleVal) {
+            roleSelect.addClass('is-invalid');
+            isValid = false;
+        }
+    });
+
+    if (!isValid) {
+        errorDivision.text('All fields in each workflow step are mandatory.');
+        return;
+    }
+
+    // Duplicate Check Division
+    let duplicate = divisions.some((item, index) => divisions.indexOf(item) !== index);
     if (duplicate) {
         Swal.fire({
             icon: 'error',
             title: 'Duplicate Division',
-            text: 'Each tier must have different division'
+            text: 'Each tier must have a different division.'
         });
         return;
     }
 
-    if (!isValid) return;
-
-    // =====================
-    // SWEETALERT CONFIRM EDIT
-    // =====================
+    // SweetAlert Confirm
     Swal.fire({
-       title: 'Are you sure update this data?',
-            icon: 'warning',
-            showCancelButton: true,
-            reverseButtons: true,
-            confirmButtonColor: '#4e73df',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'Cancel'
+        title: 'Are you sure update this data?',
+        icon: 'warning',
+        showCancelButton: true,
+        reverseButtons: true,
+        confirmButtonColor: '#4e73df',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
             this.submit();

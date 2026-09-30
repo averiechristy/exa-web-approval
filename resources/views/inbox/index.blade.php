@@ -2,6 +2,14 @@
 @section('title', 'Inbox')
 
 <style>
+    input[type="date"].form-control-sm {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+.form-label {
+    display: inline-block;
+    margin-bottom: 0.35rem !important;
+}
     .hover-shadow {
         transition: all 0.25s ease;
     }
@@ -146,27 +154,27 @@
         <div class="d-flex justify-content-between mb-3">
             <div>
                 <button class="btn btn-success mr-2" id="bulkExportBtn" disabled>
-                    <i class="fas fa-file-export"></i> Export
+                    <i class="fas fa-file-export"></i> Bulk Download
                 </button>
                 <button class="btn btn-primary" id="bulkApproveBtn" disabled>
-                    <i class="fas fa-check-circle"></i> Approve
+                    <i class="fas fa-check-circle"></i> Bulk Approve
                 </button>
             </div>
         </div>
-    <!-- Filter -->
+<!-- Filter -->
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-body">
         <form method="GET" action="{{ route('inbox.index') }}">
-            <div class="row g-2 align-items-end">
+            <div class="row g-3 align-items-end">
                 <!-- Document Name -->
                 <div class="col-lg-3 col-md-4">
-                    <label class="form-label small font-weight-bold text-muted mb-1">Document Name</label>
+                    <label class="form-label small font-weight-bold text-muted mb-2">Document Name</label>
                     <input type="text" name="search" class="form-control form-control-sm" placeholder="Search document name..." value="{{ request('search') }}">
                 </div>
 
                 <!-- Status -->
                 <div class="col-lg-2 col-md-4">
-                    <label class="form-label small font-weight-bold text-muted mb-1">Status</label>
+                    <label class="form-label small font-weight-bold text-muted mb-2">Status</label>
                     <select class="form-control form-control-sm" name="status">
                         <option value="">All Status</option>
                         <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
@@ -178,7 +186,7 @@
 
                 <!-- Requester -->
                 <div class="col-lg-3 col-md-4">
-                    <label class="form-label small font-weight-bold text-muted mb-1">Requester</label>
+                    <label class="form-label small font-weight-bold text-muted mb-2">Requester</label>
                     <select class="form-control form-control-sm select2" id="requesterSelect" name="requester_id">
                         <option value="">All Requesters</option>
                         @foreach($userOptions as $user)
@@ -190,8 +198,8 @@
                 </div>
 
                 <!-- Addressee -->
-                <div class="col-lg-3 col-md-4">
-                    <label class="form-label small font-weight-bold text-muted mb-1">Addressee</label>
+                <div class="col-lg-4 col-md-4">
+                    <label class="form-label small font-weight-bold text-muted mb-2">Addressee</label>
                     <select class="form-control form-control-sm select2" id="addresseeSelect" name="addressee_id">
                         <option value="">All Addressees</option>
                         @foreach($addresseeOptions as $user)
@@ -204,18 +212,18 @@
 
                 <!-- From Date -->
                 <div class="col-lg-2 col-md-3 col-6">
-                    <label class="form-label small font-weight-bold text-muted mb-1">From</label>
-                    <input type="date" class="form-control form-control-sm" name="from_date" value="{{ request('from_date') }}">
+                    <label class="form-label small font-weight-bold text-muted mb-2">From</label>
+                    <input type="date" class="form-control form-control-sm px-2" name="from_date" value="{{ request('from_date') }}">
                 </div>
 
                 <!-- To Date -->
                 <div class="col-lg-2 col-md-3 col-6">
-                    <label class="form-label small font-weight-bold text-muted mb-1">To</label>
-                    <input type="date" class="form-control form-control-sm" name="to_date" value="{{ request('to_date') }}">
+                    <label class="form-label small font-weight-bold text-muted mb-2">To</label>
+                    <input type="date" class="form-control form-control-sm px-2" name="to_date" value="{{ request('to_date') }}">
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="col-12 text-end mt-3">
+                <div class="col-lg-8 col-md-6 col-12 text-end mt-3">
                     <button class="btn btn-primary btn-sm me-1" type="submit">
                         <i class="fas fa-filter me-1"></i> Apply Filter
                     </button>
@@ -668,7 +676,6 @@ bulkApproveBtn?.addEventListener('click', async function () {
         }
     });
 
-    // Jika ada dokumen yang statusnya sudah Approved atau Rejected
     if (invalidStatusList.length > 0) {
         Swal.fire({
             icon: 'error',
@@ -689,10 +696,9 @@ bulkApproveBtn?.addEventListener('click', async function () {
             confirmButtonColor: '#d33',
             confirmButtonText: 'Understand'
         });
-        return; // Hentikan eksekusi, tidak ada AJAX call yang dikirim
+        return;
     }
 
-    // Konfirmasi Konfirmasi Approval
     const confirmResult = await Swal.fire({
         title: 'Are you sure?',
         html: `You are about to approve <strong>${documentIds.length}</strong> document(s).<br><br>
@@ -713,30 +719,32 @@ bulkApproveBtn?.addEventListener('click', async function () {
     this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing...`;
 
     try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        
         const response = await fetch('{{ route("inbox.bulkApprove") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                'Accept': 'application/json', // Menerangkan ke Laravel agar selalu merespons dengan JSON
+                'X-CSRF-TOKEN': csrfToken
             },
             body: JSON.stringify({ document_ids: documentIds })
         });
 
-        const result = await response.json();
+        // Tangani jika response berupa HTML / Non-JSON (misal CSRF expired atau Error 500)
+        const contentType = response.headers.get('content-type');
+        let result = {};
 
-        if (result.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: result.message,
-                timer: 2500,
-                showConfirmButton: false
-            }).then(() => location.reload());
+        if (contentType && contentType.includes('application/json')) {
+            result = await response.json();
         } else {
-            // Penanganan error detail jika diprotes backend
-            let errorMessage = result.error || result.message || 'Operation failed.';
+            const rawText = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}). Check server logs.`);
+        }
+
+        if (!response.ok || !result.success) {
+            let errorMessage = result.error || result.message || 'Please make sure all selected documents have been opened and reviewed before approval.';
             
-            // Format daftar error khusus jika mengembalikan invalid_documents dari Controller
             let formattedInvalidDocs = '';
             if (result.invalid_documents && result.invalid_documents.length > 0) {
                 formattedInvalidDocs = `
@@ -755,19 +763,31 @@ bulkApproveBtn?.addEventListener('click', async function () {
                 confirmButtonColor: '#d33',
                 confirmButtonText: 'Close'
             });
+            return;
         }
+
+        // Jika Berhasil
+        Swal.fire({
+            icon: 'success',
+            title: 'Success',
+            text: result.message || 'Documents approved successfully.',
+            timer: 2500,
+            showConfirmButton: false
+        }).then(() => location.reload());
+
     } catch (error) {
         Swal.fire({
             icon: 'error',
-            title: 'Error',
-            text: 'Connection error. Please try again.'
+            title: 'System Error',
+            text: error.message || 'An unexpected error occurred while processing bulk approval.',
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Close'
         });
     } finally {
         this.disabled = false;
         this.innerHTML = originalText;
     }
 });
-
 {{-- Tambahkan di dalam <script> yang sudah ada --}}
 // ==================== BULK EXPORT HANDLER ====================
 bulkExportBtn?.addEventListener('click', async function () {

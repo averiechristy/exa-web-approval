@@ -132,7 +132,7 @@
 
             <!-- ================= APPROVERS ================= -->
             <h5 class="font-weight-bold text-primary mb-4">
-                <i class="fas fa-users mr-2"></i> Approver List
+                <i class="fas fa-users mr-2"></i> Bulk Approver List
             </h5>
             
             <div id="tierContainer" class="mb-5">
@@ -192,7 +192,7 @@
                 <!-- SIGNER PANEL -->
                 <div class="col-md-2">
                     <h6 class="font-weight-bold text-primary mb-3">
-                        <i class="fas fa-user-check mr-2"></i> Approvers
+                        <i class="fas fa-user-check mr-2"></i> Bulk Approvers
                     </h6>
                     <div class="list-group mb-3" id="dynamicSignerList" style="max-height: 600px; overflow-y: auto;">
                         <!-- Diisi JS -->

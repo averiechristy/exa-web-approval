@@ -151,7 +151,7 @@
         <div class="d-flex justify-content-between mb-3">
             <div>
                 <button class="btn btn-success mr-2" id="bulkExportBtn" disabled>
-                    <i class="fas fa-file-export"></i> Export
+                    <i class="fas fa-file-export"></i>  Bulk Download
                 </button>
             </div>
 

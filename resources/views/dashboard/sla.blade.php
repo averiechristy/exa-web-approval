@@ -16,7 +16,7 @@
     <!-- Filter Form -->
     <div class="card shadow mb-4">
         <div class="card-body">
-            <form method="GET" action="{{ route('dashboard.sla') }}" class="row gx-3 gy-2 align-items-start">
+            <form id="sla-filter-form" method="GET" action="{{ route('dashboard.sla') }}" class="row gx-3 gy-2 align-items-start">
                 
                 <!-- Dashboard Perspective -->
                 <div class="col-sm-2">
@@ -24,17 +24,11 @@
                         <option value="INBOX" {{ $viewMode === 'INBOX' ? 'selected' : '' }}>APPROVAL</option>
                         <option value="SENT" {{ $viewMode === 'SENT' ? 'selected' : '' }}>REQUEST</option>
                     </select>
-                    <div class="d-flex mt-3" style="gap: 8px;">
-                        <button type="submit" class="btn btn-primary btn-sm flex-fill" title="Terapkan Filter">
-                            <i class="fas fa-filter fa-sm text-white-50 mr-1 me-1"></i> Filter
-                        </button>
-
-                        @if(request()->hasAny(['view', 'status', 'staff_user_id', 'from_date', 'to_date']))
-                            <a href="{{ route('dashboard.sla') }}" class="btn btn-secondary btn-sm flex-fill" title="Reset Filter">
-                                <i class="fas fa-undo fa-sm text-white-50 mr-1 me-1"></i> Reset
-                            </a>
-                        @endif
-                    </div>
+                    @if(request()->hasAny(['view', 'status', 'staff_user_id', 'from_date', 'to_date']))
+                        <a href="{{ route('dashboard.sla') }}" class="btn btn-secondary btn-sm btn-block mt-3" title="Reset Filter">
+                            <i class="fas fa-undo fa-sm text-white-50 mr-1 me-1"></i> Reset
+                        </a>
+                    @endif
                 </div>
 
                 <!-- Filter Status -->
@@ -111,7 +105,7 @@
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Approved</div>
-                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['approved_today'] }}</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['approved'] }}</div>
                 </div>
             </div>
         </div>
@@ -337,6 +331,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+const slaFilterForm = document.getElementById('sla-filter-form');
+slaFilterForm?.addEventListener('change', function (event) {
+    if (!event.target.matches('select, input[type="date"]')) return;
+    if (slaFilterForm.requestSubmit) slaFilterForm.requestSubmit();
+    else slaFilterForm.submit();
+});
+
 // 1. Status Doughnut Chart
 new Chart(document.getElementById('statusPieChart'), {
     type: 'doughnut',

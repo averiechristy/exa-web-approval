@@ -17,6 +17,8 @@ class SlaDashboardController extends Controller
     {
         $activeOrgId = session('active_organization_id');
         $authUserId = auth()->id();
+        $viewMode = strtoupper($request->input('view', 'INBOX'));
+        $viewMode = in_array($viewMode, ['SENT', 'INBOX'], true) ? $viewMode : 'INBOX';
 
         // 1. Cek hak akses dan role level
         $currentAccess = \App\Models\UserAccess::with('role')
@@ -100,16 +102,18 @@ class SlaDashboardController extends Controller
             });
         });
 
-        $targetApproverId = ($showStaffFilter && $request->filled('staff_user_id')) 
+        $targetUserId = ($showStaffFilter && $request->filled('staff_user_id'))
             ? $request->staff_user_id 
             : $authUserId;
 
-        if ($showStaffFilter && $request->filled('staff_user_id')) {
-            $query->where('approver_id', $targetApproverId);
+        if ($viewMode === 'SENT') {
+            $query->whereHas('document', function ($q) use ($targetUserId) {
+                $q->where('requester_id', $targetUserId);
+            });
         } else {
-            $query->where('approver_id', $targetApproverId)
-                ->whereHas('document', function ($q) use ($authUserId) {
-                    $q->where('requester_id', '!=', $authUserId);
+            $query->where('approver_id', $targetUserId)
+                ->whereHas('document', function ($q) use ($targetUserId) {
+                    $q->where('requester_id', '!=', $targetUserId);
                 });
         }
 
@@ -118,7 +122,9 @@ class SlaDashboardController extends Controller
             $query->where('division_id', $request->division_id);
         }
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            $query->whereHas('document', function ($q) use ($request) {
+                $q->where('status', $request->status);
+            });
         }
         if ($request->filled('from_date')) {
             $query->whereDate('started_at', '>=', $request->from_date);
@@ -133,31 +139,21 @@ class SlaDashboardController extends Controller
 
         // ==================== REVISI KALKULASI SUMMARY ====================
 
-        // Total data approval yang relevan
-        $totalCount = $baseQuery->count();
+        $documentStatusCounts = (clone $baseQuery)
+            ->join('documents as dashboard_documents', 'dashboard_documents.id', '=', 'document_approvals.document_id')
+            ->select('dashboard_documents.status')
+            ->selectRaw('COUNT(DISTINCT document_approvals.document_id) as total_documents')
+            ->groupBy('dashboard_documents.status')
+            ->pluck('total_documents', 'dashboard_documents.status');
 
-        // 1. Pending: Hanya yang memang masih pending dan Dokumennya belum Rejected
-        $pendingCount = (clone $baseQuery)
-            ->where('document_approvals.status', 'Pending')
-            ->whereHas('document', fn($d) => $d->where('status', '!=', 'Rejected'))
-            ->count();
+        $totalCount = $documentStatusCounts->sum();
 
-        // 2. Approved: Hanya yang status approval-nya Approved DAN status Dokumen Utamanya JUGA Approved
-        $approvedCount = (clone $baseQuery)
-            ->where('document_approvals.status', 'Approved')
-            ->whereHas('document', fn($d) => $d->where('status', 'Approved'))
-            ->count();
+        $pendingCount = $documentStatusCounts->get('Need Approval', 0);
+        $inProgressCount = $documentStatusCounts->get('In Progress', 0);
 
-        // 3. Rejected: Approval yang di-reject LANGSUNG oleh dirinya OR Approval milik dia yang tadinya Approved tapi DOKUMEN AKHIRNYA di-reject oleh approver tingkat lanjut
-        $rejectedCount = (clone $baseQuery)
-            ->where(function ($q) {
-                $q->where('document_approvals.status', 'Rejected')
-                  ->orWhere(function ($sub) {
-                      $sub->where('document_approvals.status', 'Approved')
-                          ->whereHas('document', fn($d) => $d->where('status', 'Rejected'));
-                  });
-            })
-            ->count();
+        $approvedCount = $documentStatusCounts->get('Approved', 0);
+
+        $rejectedCount = $documentStatusCounts->get('Rejected', 0);
 
         // 4. Overdue
         $overdueCount = (clone $baseQuery)
@@ -177,6 +173,7 @@ class SlaDashboardController extends Controller
         $summary = [
             'total'          => $totalCount,
             'pending'        => $pendingCount,
+            'in_progress'    => $inProgressCount,
             'approved'       => $approvedCount,
             'rejected'       => $rejectedCount,
             'overdue'        => $overdueCount,
@@ -370,6 +367,7 @@ class SlaDashboardController extends Controller
             'approverData'     => $approverData,
             'showStaffFilter'  => $showStaffFilter,
             'staffUsers'       => $staffUsers,
+            'viewMode'         => $viewMode,
             'organizations'    => Organization::orderBy('organization_name')->get(),
             'divisions'        => Division::orderBy('division_name')->get(),
             'approvers'        => User::orderBy('name')->get(),

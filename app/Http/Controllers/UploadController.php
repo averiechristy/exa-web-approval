@@ -283,6 +283,38 @@ public function getWorkflowApprovers($workflowId, Request $request)
     }
 
     /**
+     * Check uploaded document names before the user continues the upload wizard.
+     */
+    public function checkDuplicateNames(Request $request)
+    {
+        $validated = $request->validate([
+            'names' => ['required', 'array', 'min:1', 'max:5'],
+            'names.*' => ['required', 'string'],
+        ]);
+
+        $normalizedNames = collect($validated['names'])
+            ->map(fn ($name) => mb_strtolower(trim($name)))
+            ->filter();
+
+        $existingNames = Documents::query()
+            ->whereIn(DB::raw('LOWER(document_name)'), $normalizedNames->unique()->values()->all())
+            ->pluck('document_name')
+            ->map(fn ($name) => mb_strtolower(trim($name)));
+
+        $duplicateKeys = $normalizedNames->duplicates()
+            ->merge($existingNames)
+            ->unique()
+            ->values();
+
+        $duplicates = collect($validated['names'])
+            ->filter(fn ($name) => $duplicateKeys->contains(mb_strtolower(trim($name))))
+            ->unique(fn ($name) => mb_strtolower(trim($name)))
+            ->values();
+
+        return response()->json(['duplicates' => $duplicates]);
+    }
+
+    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)

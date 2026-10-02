@@ -648,7 +648,7 @@ function renderSignerListFromStep2() {
 }
     // ================= NEXT BUTTON HANDLER - FULL VERSION =================
     document.querySelectorAll('.nextBtn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
             // ================= STEP 1 VALIDATION =================
             if (currentStep === 0) {
                 // File validation
@@ -702,6 +702,44 @@ if (missingFields.length > 0) {
         confirmButtonText: 'OK'
     });
     return;
+}
+
+btn.disabled = true;
+try {
+    const response = await fetch('{{ route("documents.checkDuplicateNames") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        body: JSON.stringify({ names: uploadedFiles.map(file => file.name) })
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+        throw new Error(result.message || 'Unable to check document names.');
+    }
+
+    if (result.duplicates.length > 0) {
+        await Swal.fire({
+            icon: 'warning',
+            title: 'Duplicate Document Name',
+            text: `These document names already exist or are duplicated in this upload: ${result.duplicates.join(', ')}`,
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+} catch (error) {
+    await Swal.fire({
+        icon: 'error',
+        title: 'Could Not Check Document Names',
+        text: error.message || 'Please try again before continuing.',
+        confirmButtonText: 'OK'
+    });
+    return;
+} finally {
+    btn.disabled = false;
 }
 
                 // Save Step 1 data
@@ -1446,29 +1484,6 @@ function renderRequesterSection() {
         }
 
         if (files.length === 0) return;
-
-        const existingNames = new Set(uploadedFiles.map(file => file.name.toLowerCase()));
-        const incomingNames = new Set();
-        const duplicateNames = [];
-
-        files = files.filter(file => {
-            const normalizedName = file.name.toLowerCase();
-            if (existingNames.has(normalizedName) || incomingNames.has(normalizedName)) {
-                duplicateNames.push(file.name);
-                return false;
-            }
-            incomingNames.add(normalizedName);
-            return true;
-        });
-
-        if (duplicateNames.length > 0) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Duplicate Document Name',
-                text: `These document names are already selected: ${duplicateNames.join(', ')}`,
-                confirmButtonText: 'OK'
-            });
-        }
 
         files.forEach(file => {
             if (file.type !== "application/pdf") {

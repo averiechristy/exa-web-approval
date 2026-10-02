@@ -2,6 +2,19 @@
 @section('title', 'Sent')
 
 <style>
+    .document-filter .form-control-sm {
+        height: 34px;
+    }
+
+    .document-filter .select2-container--bootstrap4 .select2-selection--single {
+        height: 34px !important;
+        min-height: 34px !important;
+    }
+
+    .document-filter .date-filter {
+        margin-top: 1rem;
+    }
+
     input[type="date"].form-control-sm {
     padding-left: 10px !important;
     padding-right: 10px !important;
@@ -162,9 +175,12 @@
         </div>
     <!-- Filter -->
 <!-- Filter -->
-<div class="card shadow-sm border-0 mb-4">
+<div class="card shadow-sm border-0 mb-4 document-filter">
     <div class="card-body">
         <form method="GET" action="{{ route('sent.index') }}">
+            @if(request()->filled('perPage'))
+                <input type="hidden" name="perPage" value="{{ request('perPage') }}">
+            @endif
             <div class="row g-3 align-items-end">
                 <!-- Document Name -->
                 <div class="col-lg-3 col-md-4">
@@ -211,22 +227,19 @@
                 </div>
 
                 <!-- From Date -->
-                <div class="col-lg-2 col-md-3 col-6">
+                <div class="col-lg-2 col-md-3 col-6 date-filter">
                     <label class="form-label small font-weight-bold text-muted mb-2">From</label>
                     <input type="date" class="form-control form-control-sm px-2" name="from_date" value="{{ request('from_date') }}">
                 </div>
 
                 <!-- To Date -->
-                <div class="col-lg-2 col-md-3 col-6">
+                <div class="col-lg-2 col-md-3 col-6 date-filter">
                     <label class="form-label small font-weight-bold text-muted mb-2">To</label>
                     <input type="date" class="form-control form-control-sm px-2" name="to_date" value="{{ request('to_date') }}">
                 </div>
 
-                <!-- Action Buttons -->
+                <!-- Filter Actions -->
                 <div class="col-lg-8 col-md-6 col-12 text-end mt-3">
-                    <button class="btn btn-primary btn-sm me-1" type="submit">
-                        <i class="fas fa-filter me-1"></i> Apply Filter
-                    </button>
                     <a href="{{ route('sent.index') }}" class="btn btn-secondary btn-sm">
                         <i class="fas fa-undo me-1"></i> Reset
                     </a>
@@ -547,33 +560,18 @@ const checkboxes = document.querySelectorAll('.rowCheckbox');
 const bulkExportBtn = document.getElementById('bulkExportBtn');
 const bulkApproveBtn = document.getElementById('bulkApproveBtn');
 
-let searchTimer;
-$('#searchInput').on('keyup', function () {
-    clearTimeout(searchTimer);
+const filterForm = document.querySelector('.document-filter form');
+let filterSearchTimer;
+filterForm?.querySelector('[name="search"]')?.addEventListener('input', function () {
+    clearTimeout(filterSearchTimer);
+    filterSearchTimer = setTimeout(() => filterForm.requestSubmit(), 450);
+});
 
-    let value = $(this).val().trim();
-
-    searchTimer = setTimeout(function () {
-        let url = new URL(window.location.href);
-
-        if (value) {
-            url.searchParams.set('search', value);
-        } else {
-            url.searchParams.delete('search');
-        }
-
-        // Preserve other parameters (perPage, status, requester_id, dll)
-        const paramsToKeep = ['status', 'requester_id', 'from_date', 'to_date', 'perPage'];
-        paramsToKeep.forEach(param => {
-            let val = url.searchParams.get(param);
-            if (!val) {
-                const currentVal = new URLSearchParams(window.location.search).get(param);
-                if (currentVal) url.searchParams.set(param, currentVal);
-            }
-        });
-
-        window.location.href = url.toString();
-    }, 450); // delay 450ms
+filterForm?.querySelectorAll('select, input[type="date"]').forEach((control) => {
+    control.addEventListener('change', function () {
+        clearTimeout(filterSearchTimer);
+        filterForm.requestSubmit();
+    });
 });
 
 $(document).ready(function () {

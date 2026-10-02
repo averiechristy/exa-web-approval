@@ -620,7 +620,7 @@ public function bulkApprove(Request $request)
         }
 
         return response()->json([
-            'success' => true,
+            'success' => empty($results['failed']),
             'message' => "Bulk approve completed. Success: " . count($results['success']) . ", Failed: " . count($results['failed']),
             'results' => $results
         ]);

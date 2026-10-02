@@ -18,11 +18,20 @@
         <div class="card-body">
             <form method="GET" action="{{ route('dashboard.sla') }}" class="row gx-3 gy-2 align-items-center">
                 
+                <!-- Dashboard Perspective -->
+                <div class="col-sm-2">
+                    <select name="view" class="form-control form-control-sm">
+                        <option value="INBOX" {{ $viewMode === 'INBOX' ? 'selected' : '' }}>INBOX</option>
+                        <option value="SENT" {{ $viewMode === 'SENT' ? 'selected' : '' }}>SENT</option>
+                    </select>
+                </div>
+
                 <!-- Filter Status -->
-                <div class="col-sm-3">
+                <div class="col-sm-2">
                     <select name="status" class="form-control form-control-sm">
                         <option value="">-- All Statuses --</option>
-                        <option value="Pending" {{ request('status') == 'Pending' ? 'selected' : '' }}>Pending</option>
+                        <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
+                        <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
                         <option value="Approved" {{ request('status') == 'Approved' ? 'selected' : '' }}>Approved</option>
                         <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
                     </select>
@@ -48,7 +57,7 @@
                 @endif
 
                 <!-- Filter Range Date -->
-                <div class="{{ $showStaffFilter ? 'col-sm-4' : 'col-sm-6' }} d-flex align-items-center">
+                <div class="{{ $showStaffFilter ? 'col-sm-3' : 'col-sm-6' }} d-flex align-items-center">
                     <input type="date" name="from_date" class="form-control form-control-sm" value="{{ request('from_date') }}">
                     <span class="mx-2 text-muted">to</span>
                     <input type="date" name="to_date" class="form-control form-control-sm" value="{{ request('to_date') }}">
@@ -61,7 +70,7 @@
         <i class="fas fa-filter fa-sm text-white-50 mr-1 me-1"></i> Filter
     </button>
     
-    @if(request()->hasAny(['status', 'staff_user_id', 'from_date', 'to_date']))
+    @if(request()->hasAny(['view', 'status', 'staff_user_id', 'from_date', 'to_date']))
         <a href="{{ route('dashboard.sla') }}" class="btn btn-secondary btn-sm w-100" title="Reset Filter">
             <i class="fas fa-undo fa-sm text-white-50 mr-1 me-1"></i> Reset
         </a>
@@ -85,7 +94,7 @@
         <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-warning shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Approval</div>
+                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Need Approval</div>
                     <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['pending'] }}</div>
                 </div>
             </div>
@@ -325,15 +334,16 @@
 new Chart(document.getElementById('statusPieChart'), {
     type: 'doughnut',
     data: {
-        labels: ['Approved', 'Pending', 'Rejected'],
+        labels: ['Need Approval', 'In Progress', 'Approved', 'Rejected'],
         datasets: [{
             data: [
-                {{ $summary['approved'] }},
                 {{ $summary['pending'] }},
+                {{ $summary['in_progress'] }},
+                {{ $summary['approved'] }},
                 {{ $summary['rejected'] }}
             ],
-            backgroundColor: ['#1cc88a', '#f6c23e', '#e74a3b'],
-            hoverBackgroundColor: ['#17a673', '#dddfeb', '#be2617'],
+            backgroundColor: ['#f6c23e', '#36b9cc', '#1cc88a', '#e74a3b'],
+            hoverBackgroundColor: ['#dda20a', '#2c9faf', '#17a673', '#be2617'],
             hoverBorderColor: "rgba(234, 236, 244, 1)",
         }]
     },

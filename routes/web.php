@@ -79,6 +79,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/api/workflow-approvers/{workflow_id}', [UploadController::class, 'getWorkflowApprovers']);
     Route::post('/documents/store', [UploadController::class, 'store'])->name('documents.store');
+    Route::post('/documents/check-duplicate-names', [UploadController::class, 'checkDuplicateNames'])
+        ->name('documents.checkDuplicateNames');
     
     // Inbox
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index')->middleware('user');

@@ -2,6 +2,19 @@
 @section('title', 'Inbox')
 
 <style>
+    .document-filter .form-control-sm {
+        height: 34px;
+    }
+
+    .document-filter .select2-container--bootstrap4 .select2-selection--single {
+        height: 34px !important;
+        min-height: 34px !important;
+    }
+
+    .document-filter .date-filter {
+        margin-top: 1rem;
+    }
+
     input[type="date"].form-control-sm {
     padding-left: 10px !important;
     padding-right: 10px !important;
@@ -162,9 +175,12 @@
             </div>
         </div>
 <!-- Filter -->
-<div class="card shadow-sm border-0 mb-4">
+<div class="card shadow-sm border-0 mb-4 document-filter">
     <div class="card-body">
         <form method="GET" action="{{ route('inbox.index') }}">
+            @if(request()->filled('perPage'))
+                <input type="hidden" name="perPage" value="{{ request('perPage') }}">
+            @endif
             <div class="row g-3 align-items-end">
                 <!-- Document Name -->
                 <div class="col-lg-3 col-md-4">
@@ -211,22 +227,19 @@
                 </div>
 
                 <!-- From Date -->
-                <div class="col-lg-2 col-md-3 col-6">
+                <div class="col-lg-2 col-md-3 col-6 date-filter">
                     <label class="form-label small font-weight-bold text-muted mb-2">From</label>
                     <input type="date" class="form-control form-control-sm px-2" name="from_date" value="{{ request('from_date') }}">
                 </div>
 
                 <!-- To Date -->
-                <div class="col-lg-2 col-md-3 col-6">
+                <div class="col-lg-2 col-md-3 col-6 date-filter">
                     <label class="form-label small font-weight-bold text-muted mb-2">To</label>
                     <input type="date" class="form-control form-control-sm px-2" name="to_date" value="{{ request('to_date') }}">
                 </div>
 
-                <!-- Action Buttons -->
+                <!-- Filter Actions -->
                 <div class="col-lg-8 col-md-6 col-12 text-end mt-3">
-                    <button class="btn btn-primary btn-sm me-1" type="submit">
-                        <i class="fas fa-filter me-1"></i> Apply Filter
-                    </button>
                     <a href="{{ route('inbox.index') }}" class="btn btn-secondary btn-sm">
                         <i class="fas fa-undo me-1"></i> Reset
                     </a>
@@ -535,6 +548,20 @@ $('#requesterSelect, #addresseeSelect').select2({
         width: '100%'
     });
 
+const filterForm = document.querySelector('.document-filter form');
+let filterSearchTimer;
+filterForm?.querySelector('[name="search"]')?.addEventListener('input', function () {
+    clearTimeout(filterSearchTimer);
+    filterSearchTimer = setTimeout(() => filterForm.requestSubmit(), 450);
+});
+
+filterForm?.querySelectorAll('select, input[type="date"]').forEach((control) => {
+    control.addEventListener('change', function () {
+        clearTimeout(filterSearchTimer);
+        filterForm.requestSubmit();
+    });
+});
+
 $(document).ready(function () {
 
     $('.btn-move-folder').on('click', function (e) {
@@ -744,6 +771,7 @@ bulkApproveBtn?.addEventListener('click', async function () {
 
         if (!response.ok || !result.success) {
             let errorMessage = result.error || result.message || 'Please make sure all selected documents have been opened and reviewed before approval.';
+            const failedResults = result.results?.failed ?? [];
             
             let formattedInvalidDocs = '';
             if (result.invalid_documents && result.invalid_documents.length > 0) {
@@ -756,10 +784,28 @@ bulkApproveBtn?.addEventListener('click', async function () {
                     </div>`;
             }
 
+            let formattedFailedDocs = '';
+            if (failedResults.length > 0) {
+                const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                })[character]);
+                formattedFailedDocs = `
+                    <div class="text-left mt-3">
+                        <p class="text-danger mb-1 font-weight-bold small">Failed documents:</p>
+                        <ul class="small text-muted pl-3 mb-0">
+                            ${failedResults.map(item => `<li>${escapeHtml(item.name || 'Document')}: ${escapeHtml(item.reason)}</li>`).join('')}
+                        </ul>
+                    </div>`;
+            }
+
             Swal.fire({
-                icon: 'error',
-                title: 'Bulk Approve Failed',
-                html: `<div>${errorMessage}</div>${formattedInvalidDocs}`,
+                icon: failedResults.length > 0 && result.results?.success?.length > 0 ? 'warning' : 'error',
+                title: failedResults.length > 0 && result.results?.success?.length > 0 ? 'Bulk Approve Partially Failed' : 'Bulk Approve Failed',
+                html: `<div>${errorMessage}</div>${formattedInvalidDocs}${formattedFailedDocs}`,
                 confirmButtonColor: '#d33',
                 confirmButtonText: 'Close'
             });

@@ -272,7 +272,28 @@
     <tr>
         <td><input type="checkbox" class="rowCheckbox" value="{{ $document->id }}"></td>
         <td>
-            <strong>{{ $document->document_name }}</strong>
+            @php
+                $isUnread = $document->documentApprovals->contains(function ($approval) use ($document) {
+                    if (
+                        $approval->approver_id != auth()->id()
+                        || $approval->is_requester
+                        || $approval->status !== 'Pending'
+                        || (int) $approval->tier !== (int) $document->current_tier
+                        || $approval->flag_open
+                    ) {
+                        return false;
+                    }
+
+                    return !$document->documentApprovals->contains(fn ($previousApproval) =>
+                        (int) $previousApproval->tier === (int) $approval->tier
+                        && $previousApproval->status === 'Pending'
+                        && $previousApproval->approver_order < $approval->approver_order
+                    );
+                });
+            @endphp
+            <span class="{{ $isUnread ? 'font-weight-bold' : 'font-weight-normal' }}">
+                {{ $document->document_name }}
+            </span>
         </td>
         <td>
             <span class="badge

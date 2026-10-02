@@ -8,12 +8,12 @@
 
     <div class="card shadow mb-4">
         <div class="card-body">
-            <form method="GET" action="{{ route('superadmin.documents.index') }}" class="form-row align-items-end mb-4">
-                <div class="col-md-5 mb-2">
+            <form id="document-filter-form" method="GET" action="{{ route('superadmin.documents.index') }}" class="form-row align-items-end mb-4">
+                <div class="col-md-3 mb-2">
                     <label for="search">Document Name</label>
                     <input id="search" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search documents...">
                 </div>
-                <div class="col-md-3 mb-2">
+                <div class="col-md-2 mb-2">
                     <label for="status">Status</label>
                     <select id="status" name="status" class="form-control">
                         <option value="">All statuses</option>
@@ -22,11 +22,27 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-2 mb-2">
-                    <button class="btn btn-primary btn-block" type="submit"><i class="fas fa-filter"></i> Filter</button>
+                <div class="col-md-3 mb-2">
+                    <label for="requester_id">Requester</label>
+                    <select id="requester_id" name="requester_id" class="form-control">
+                        <option value="">All requesters</option>
+                        @foreach($requesters as $requester)
+                            <option value="{{ $requester->id }}" @selected(request('requester_id') == $requester->id)>
+                                {{ $requester->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-md-2 mb-2">
-                    <a class="btn btn-secondary btn-block" href="{{ route('superadmin.documents.index') }}">Reset</a>
+                    <label for="from_date">From</label>
+                    <input id="from_date" type="date" name="from_date" value="{{ request('from_date') }}" class="form-control">
+                </div>
+                <div class="col-md-2 mb-2">
+                    <label for="to_date">To</label>
+                    <input id="to_date" type="date" name="to_date" value="{{ request('to_date') }}" class="form-control">
+                </div>
+                <div class="col-12 text-right mt-2">
+                    <a class="btn btn-secondary btn-sm" href="{{ route('superadmin.documents.index') }}">Reset</a>
                 </div>
             </form>
 
@@ -85,6 +101,24 @@
 
 @push('scripts')
 <script>
+    const documentFilterForm = document.getElementById('document-filter-form');
+    let documentSearchTimer;
+
+    documentFilterForm?.querySelector('[name="search"]')?.addEventListener('input', function () {
+        clearTimeout(documentSearchTimer);
+        documentSearchTimer = setTimeout(() => {
+            if (documentFilterForm.requestSubmit) documentFilterForm.requestSubmit();
+            else documentFilterForm.submit();
+        }, 450);
+    });
+
+    documentFilterForm?.addEventListener('change', function (event) {
+        if (!event.target.matches('select, input[type="date"]')) return;
+        clearTimeout(documentSearchTimer);
+        if (documentFilterForm.requestSubmit) documentFilterForm.requestSubmit();
+        else documentFilterForm.submit();
+    });
+
     document.querySelectorAll('.void-document-form').forEach(form => {
         form.addEventListener('submit', async event => {
             event.preventDefault();

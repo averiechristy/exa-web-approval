@@ -39,8 +39,7 @@ class SharedController extends Controller
         $query = Documents::with(['requester'])
             ->where('organization_id', $organizationId)
             ->whereIn('id', $sharedDocumentIds)
-            ->when($divisionId, fn ($query) => $query->where('requester_division_id', $divisionId))
-            ->where('status', 'Approved');
+            ->when($divisionId, fn ($query) => $query->where('requester_division_id', $divisionId));
 
         if (!empty($search)) {
             $query->whereRaw(

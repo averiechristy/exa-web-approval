@@ -107,9 +107,12 @@
         </div>
 
             <!-- Filter -->
-        <div class="card shadow-sm mb-4">
+        <div class="card shadow-sm mb-4 shared-filter">
             <div class="card-body">
                 <form method="GET" action="{{ route('shared.index') }}">
+                    @if(request()->filled('perPage'))
+                        <input type="hidden" name="perPage" value="{{ request('perPage') }}">
+                    @endif
                     <div class="row align-items-end">
                         <div class="col-md-3">
                             <label class="small font-weight-bold">Document Name</label>
@@ -146,9 +149,6 @@
                         </div>
                         <div class="col-12 text-right mt-3">
                             <div class="d-flex">
-                                <button class="btn btn-primary btn-sm mr-1" type="submit">
-                                    <i class="fas fa-filter"></i> Apply Filter
-                                </button>
                                 <a href="{{ route('shared.index') }}" class="btn btn-secondary btn-sm">
                                     <i class="fas fa-undo"></i> Reset
                                 </a>
@@ -244,6 +244,15 @@ const checkboxes = document.querySelectorAll('.rowCheckbox');
 const bulkExportBtn = document.getElementById('bulkExportBtn');
 
 let searchTimer;
+const filterForm = document.querySelector('.shared-filter form');
+let filterSubmitTimer;
+const submitFilter = () => {
+    clearTimeout(filterSubmitTimer);
+    filterSubmitTimer = setTimeout(() => {
+        if (filterForm?.requestSubmit) filterForm.requestSubmit();
+        else filterForm?.submit();
+    }, 150);
+};
 
 $('#requesterSelect').select2({
         theme: 'bootstrap4',
@@ -251,33 +260,14 @@ $('#requesterSelect').select2({
         allowClear: true,
         width: '100%'
     });
-$('#searchInput').on('keyup', function () {
+$('#searchInput').on('input', function () {
     clearTimeout(searchTimer);
-
-    let value = $(this).val().trim();
-
-    searchTimer = setTimeout(function () {
-        let url = new URL(window.location.href);
-
-        if (value) {
-            url.searchParams.set('search', value);
-        } else {
-            url.searchParams.delete('search');
-        }
-
-        // Preserve other parameters (perPage, status, requester_id, dll)
-        const paramsToKeep = ['status', 'requester_id', 'from_date', 'to_date', 'perPage'];
-        paramsToKeep.forEach(param => {
-            let val = url.searchParams.get(param);
-            if (!val) {
-                const currentVal = new URLSearchParams(window.location.search).get(param);
-                if (currentVal) url.searchParams.set(param, currentVal);
-            }
-        });
-
-        window.location.href = url.toString();
-    }, 450); // delay 450ms
+    searchTimer = setTimeout(() => {
+        if (filterForm?.requestSubmit) filterForm.requestSubmit();
+        else filterForm?.submit();
+    }, 450);
 });
+$(filterForm).on('change', 'select, input[type="date"]', submitFilter);
 
 $(document).ready(function () {
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Documents;
 use App\Models\Organization;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class SuperadminDocumentController extends Controller
@@ -22,6 +23,15 @@ class SuperadminDocumentController extends Controller
             ->when($request->filled('status'), function ($query) use ($request) {
                 $query->where('status', $request->input('status'));
             })
+            ->when($request->filled('requester_id'), function ($query) use ($request) {
+                $query->where('requester_id', $request->input('requester_id'));
+            })
+            ->when($request->filled('from_date'), function ($query) use ($request) {
+                $query->whereDate('created_at', '>=', $request->input('from_date'));
+            })
+            ->when($request->filled('to_date'), function ($query) use ($request) {
+                $query->whereDate('created_at', '<=', $request->input('to_date'));
+            })
             ->orderByDesc('updated_at')
             ->paginate($request->integer('perPage', 10))
             ->withQueryString();
@@ -33,6 +43,10 @@ class SuperadminDocumentController extends Controller
                 ->distinct()
                 ->orderBy('status')
                 ->pluck('status'),
+            'requesters' => User::query()
+                ->whereIn('id', Documents::query()->select('requester_id')->distinct())
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 

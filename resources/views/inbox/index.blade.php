@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Inbox')
+@section('title', 'Approval')
 
 <style>
     .document-filter .form-control-sm {
@@ -147,7 +147,7 @@
 
 @section('content')
 <div class="container-fluid">
-    <h1 class="h3 mb-4 text-gray-800">Inbox</h1>
+    <h1 class="h3 mb-4 text-gray-800">Approval</h1>
 
     <!-- @if(session('success'))
         <div class="alert alert-success">
@@ -550,17 +550,19 @@ $('#requesterSelect, #addresseeSelect').select2({
 
 const filterForm = document.querySelector('.document-filter form');
 let filterSearchTimer;
+const submitFilter = () => {
+    clearTimeout(filterSearchTimer);
+    filterSearchTimer = setTimeout(() => {
+        if (filterForm?.requestSubmit) filterForm.requestSubmit();
+        else filterForm?.submit();
+    }, 150);
+};
+
 filterForm?.querySelector('[name="search"]')?.addEventListener('input', function () {
     clearTimeout(filterSearchTimer);
-    filterSearchTimer = setTimeout(() => filterForm.requestSubmit(), 450);
+    filterSearchTimer = setTimeout(submitFilter, 450);
 });
-
-filterForm?.querySelectorAll('select, input[type="date"]').forEach((control) => {
-    control.addEventListener('change', function () {
-        clearTimeout(filterSearchTimer);
-        filterForm.requestSubmit();
-    });
-});
+$(filterForm).on('change', 'select, input[type="date"]', submitFilter);
 
 $(document).ready(function () {
 

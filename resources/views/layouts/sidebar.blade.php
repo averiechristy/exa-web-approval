@@ -122,16 +122,21 @@
         </li>
 
         <li class="nav-item {{ request()->routeIs('inbox.*') ? 'active' : '' }}">
-            <a class="nav-link" href="{{ route('inbox.index') }}">
+            <a class="nav-link inbox-nav-link" href="{{ route('inbox.index') }}">
                 <i class="fas fa-inbox"></i>
-                <span>Inbox</span>
+                <span>Approval</span>
+                @if($unopenedInboxCount > 0)
+                    <span class="inbox-unread-badge {{ $unopenedInboxCount > 99 ? 'wide' : '' }}" title="{{ $unopenedInboxCount }} dokumen belum dibuka" aria-label="{{ $unopenedInboxCount }} dokumen belum dibuka">
+                        {{ $unopenedInboxCount > 99 ? '99+' : $unopenedInboxCount }}
+                    </span>
+                @endif
             </a>
         </li>
 
         <li class="nav-item {{ request()->routeIs('sent.*') ? 'active' : '' }}">
             <a class="nav-link" href="{{ route('sent.index') }}">
                 <i class="fas fa-paper-plane"></i>
-                <span>Sent</span>
+                <span>Request</span>
             </a>
         </li>
 

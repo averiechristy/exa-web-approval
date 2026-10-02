@@ -33,7 +33,7 @@
         <h6 class="m-0 font-weight-bold text-primary">Search & Filter</h6>
     </div>
     <div class="card-body">
-        <form action="{{ route('audit-trail.index') }}" method="GET">
+        <form id="activity-filter-form" action="{{ route('audit-trail.index') }}" method="GET">
             <div class="row align-items-end">
                 <!-- Module / Feature -->
                 <div class="col-md-3 mb-3">
@@ -90,9 +90,6 @@
                     <a href="{{ route('audit-trail.index') }}" class="btn btn-secondary btn-sm mr-1">
                         <i class="fas fa-undo fa-sm"></i> Reset Filter
                     </a>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-filter fa-sm"></i> Apply Filter
-                    </button>
                 </div>
             </div>
         </form>
@@ -224,6 +221,12 @@ $(document).ready(function() {
         placeholder: '-- All Users --',
         allowClear: true,
         width: '100%'
+    });
+
+    const activityFilterForm = document.getElementById('activity-filter-form');
+    $(activityFilterForm).on('change', 'select, input[type="date"]', function () {
+        if (activityFilterForm.requestSubmit) activityFilterForm.requestSubmit();
+        else activityFilterForm.submit();
     });
 });
         document.body.addEventListener('click', function (event) {

@@ -16,14 +16,25 @@
     <!-- Filter Form -->
     <div class="card shadow mb-4">
         <div class="card-body">
-            <form method="GET" action="{{ route('dashboard.sla') }}" class="row gx-3 gy-2 align-items-center">
+            <form method="GET" action="{{ route('dashboard.sla') }}" class="row gx-3 gy-2 align-items-start">
                 
                 <!-- Dashboard Perspective -->
                 <div class="col-sm-2">
                     <select name="view" class="form-control form-control-sm">
-                        <option value="INBOX" {{ $viewMode === 'INBOX' ? 'selected' : '' }}>INBOX</option>
-                        <option value="SENT" {{ $viewMode === 'SENT' ? 'selected' : '' }}>SENT</option>
+                        <option value="INBOX" {{ $viewMode === 'INBOX' ? 'selected' : '' }}>APPROVAL</option>
+                        <option value="SENT" {{ $viewMode === 'SENT' ? 'selected' : '' }}>REQUEST</option>
                     </select>
+                    <div class="d-flex mt-3" style="gap: 8px;">
+                        <button type="submit" class="btn btn-primary btn-sm flex-fill" title="Terapkan Filter">
+                            <i class="fas fa-filter fa-sm text-white-50 mr-1 me-1"></i> Filter
+                        </button>
+
+                        @if(request()->hasAny(['view', 'status', 'staff_user_id', 'from_date', 'to_date']))
+                            <a href="{{ route('dashboard.sla') }}" class="btn btn-secondary btn-sm flex-fill" title="Reset Filter">
+                                <i class="fas fa-undo fa-sm text-white-50 mr-1 me-1"></i> Reset
+                            </a>
+                        @endif
+                    </div>
                 </div>
 
                 <!-- Filter Status -->
@@ -63,26 +74,13 @@
                     <input type="date" name="to_date" class="form-control form-control-sm" value="{{ request('to_date') }}">
                 </div>
 
-                <!-- Tombol Submit -->
-                <!-- Tombol Submit & Reset -->
-<div class="col-sm-2 ps-sm-3 d-flex align-items-center">
-    <button type="submit" class="btn btn-primary btn-sm w-100 mr-2 me-2" title="Terapkan Filter">
-        <i class="fas fa-filter fa-sm text-white-50 mr-1 me-1"></i> Filter
-    </button>
-    
-    @if(request()->hasAny(['view', 'status', 'staff_user_id', 'from_date', 'to_date']))
-        <a href="{{ route('dashboard.sla') }}" class="btn btn-secondary btn-sm w-100" title="Reset Filter">
-            <i class="fas fa-undo fa-sm text-white-50 mr-1 me-1"></i> Reset
-        </a>
-    @endif
-</div>
             </form>
         </div>
     </div>
 
     <!-- KPI Cards -->
     <div class="row">
-        <div class="col-xl-2 col-md-4 mb-4">
+        <div class="col-xl col-md-4 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Documents</div>
@@ -91,7 +89,7 @@
             </div>
         </div>
 
-        <div class="col-xl-2 col-md-4 mb-4">
+        <div class="col-xl col-md-4 mb-4">
             <div class="card border-left-warning shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Need Approval</div>
@@ -100,7 +98,16 @@
             </div>
         </div>
 
-        <div class="col-xl-2 col-md-4 mb-4">
+        <div class="col-xl col-md-4 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">In Progress</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['in_progress'] }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl col-md-4 mb-4">
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Approved</div>
@@ -109,7 +116,7 @@
             </div>
         </div>
 
-        <div class="col-xl-2 col-md-4 mb-4">
+        <div class="col-xl col-md-4 mb-4">
             <div class="card border-left-danger shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Rejected</div>
@@ -118,7 +125,7 @@
             </div>
         </div>
 
-        <div class="col-xl-2 col-md-4 mb-4">
+        <div class="col-xl col-md-4 mb-4">
             <div class="card border-left-danger shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Overdue</div>
@@ -127,7 +134,7 @@
             </div>
         </div>
 
-        <div class="col-xl-2 col-md-4 mb-4">
+        <div class="col-xl col-md-4 mb-4">
             <div class="card border-left-info shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Avg Approval Time</div>

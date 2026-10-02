@@ -37,6 +37,7 @@
                         <option value="">-- All Statuses --</option>
                         <option value="Need Approval" {{ request('status') == 'Need Approval' ? 'selected' : '' }}>Need Approval</option>
                         <option value="In Progress" {{ request('status') == 'In Progress' ? 'selected' : '' }}>In Progress</option>
+                        <option value="Cancelled" {{ request('status') == 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
                         <option value="Approved" {{ request('status') == 'Approved' ? 'selected' : '' }}>Approved</option>
                         <option value="Rejected" {{ request('status') == 'Rejected' ? 'selected' : '' }}>Rejected</option>
                     </select>
@@ -102,6 +103,15 @@
         </div>
 
         <div class="col-xl col-md-4 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Overdue</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['overdue'] }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl col-md-4 mb-4">
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
                     <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Approved</div>
@@ -120,10 +130,10 @@
         </div>
 
         <div class="col-xl col-md-4 mb-4">
-            <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card border-left-secondary shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Overdue</div>
-                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['overdue'] }}</div>
+                    <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">Cancelled</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $summary['cancelled'] }}</div>
                 </div>
             </div>
         </div>
@@ -342,16 +352,17 @@ slaFilterForm?.addEventListener('change', function (event) {
 new Chart(document.getElementById('statusPieChart'), {
     type: 'doughnut',
     data: {
-        labels: ['Need Approval', 'In Progress', 'Approved', 'Rejected'],
+        labels: ['Need Approval', 'In Progress', 'Approved', 'Rejected', 'Cancelled'],
         datasets: [{
             data: [
                 {{ $summary['pending'] }},
                 {{ $summary['in_progress'] }},
                 {{ $summary['approved'] }},
-                {{ $summary['rejected'] }}
+                {{ $summary['rejected'] }},
+                {{ $summary['cancelled'] }}
             ],
-            backgroundColor: ['#f6c23e', '#36b9cc', '#1cc88a', '#e74a3b'],
-            hoverBackgroundColor: ['#dda20a', '#2c9faf', '#17a673', '#be2617'],
+            backgroundColor: ['#f6c23e', '#36b9cc', '#1cc88a', '#c0392b', '#858796'],
+            hoverBackgroundColor: ['#dda20a', '#2c9faf', '#17a673', '#922b21', '#6c757d'],
             hoverBorderColor: "rgba(234, 236, 244, 1)",
         }]
     },

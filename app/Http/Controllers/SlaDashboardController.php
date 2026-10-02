@@ -154,6 +154,7 @@ class SlaDashboardController extends Controller
         $approvedCount = $documentStatusCounts->get('Approved', 0);
 
         $rejectedCount = $documentStatusCounts->get('Rejected', 0);
+        $cancelledCount = $documentStatusCounts->get('Cancelled', 0);
 
         // 4. Overdue
         $overdueCount = (clone $baseQuery)
@@ -176,6 +177,7 @@ class SlaDashboardController extends Controller
             'in_progress'    => $inProgressCount,
             'approved'       => $approvedCount,
             'rejected'       => $rejectedCount,
+            'cancelled'      => $cancelledCount,
             'overdue'        => $overdueCount,
             'approved_today' => $approvedTodayCount,
         ];

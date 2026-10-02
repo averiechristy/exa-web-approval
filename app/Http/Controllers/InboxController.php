@@ -382,14 +382,8 @@ class InboxController extends Controller
                         $pdf->SetFont('helvetica', 'B', 11);
                         $pdf->SetTextColor(0, 128, 0);
 
-                        $pdf->SetXY($x, $y);
                         $pdf->SetAutoPageBreak(false);
-                        $textWidth = $pdf->GetStringWidth($textToInsert);
-
-                        if (($x + $textWidth) > $pageWidth) {
-                            $x = $pageWidth - $textWidth - 5;
-                        }
-
+                        $pdf->SetXY($x, $y);
                         $pdf->Write(0, $textToInsert);
                     }
                 }
@@ -687,6 +681,7 @@ public function bulkApprove(Request $request)
 
                         $pdf->SetFont('helvetica', 'B', 11);
                         $pdf->SetTextColor(0, 128, 0);
+                        $pdf->SetAutoPageBreak(false);
                         $pdf->SetXY($x, $y);
                         $pdf->Write(0, $textToInsert);
                     }

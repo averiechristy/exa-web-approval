@@ -405,25 +405,9 @@ function renderSignerListFromStep2() {
     step2Data.approvers.forEach(tier => {
         tier.approvers.forEach(approver => {
             if (approver.show_on_document) {
-                
-                let approverName = approver.name || 'Unknown User';
-
-                // Special handling untuk Requester
-                if (approver.is_requester === true) {
-                    approverName = requester.name + " (You)";
-                } 
-                // Untuk approver biasa
-                else {
-                    const tierBox = $(`.tier-box[data-tier="${tier.tier}"]`);
-                    if (tierBox.length) {
-                        const select = tierBox.find('.approver-select').filter(function() {
-                            return $(this).val() == approver.user_id;
-                        });
-                        if (select.length > 0) {
-                            approverName = select.find('option:selected').text().trim() || approverName;
-                        }
-                    }
-                }
+                const approverName = approver.is_requester === true
+                    ? requester.name
+                    : (approver.name || 'Unknown User');
 
                 showOnDocSigners.push({
                     id: approver.user_id,
@@ -572,6 +556,7 @@ function renderSignerListFromStep2() {
         positionSignatureBoxAtCanvas(box, xPx, yPx);
         makeSignatureBoxDraggable(box);
         pdfArea.appendChild(box);
+        ensureSignatureBoxDoesNotOverlap(box, xPx, yPx);
 
         updateSignerUIForCurrentFile();
         draggedSigner = null;
@@ -588,6 +573,73 @@ function renderSignerListFromStep2() {
         box.style.top = `${canvasOffsetY + yPx}px`;
         box.style.zIndex = 100;
         box.style.transform = 'none';
+    }
+
+    function ensureSignatureBoxDoesNotOverlap(box, xPx, yPx) {
+        const canvasRect = pdfCanvas.getBoundingClientRect();
+        const areaRect = pdfArea.getBoundingClientRect();
+        const canvasOffsetX = canvasRect.left - areaRect.left + pdfArea.scrollLeft;
+        const canvasOffsetY = canvasRect.top - areaRect.top + pdfArea.scrollTop;
+        const gap = 24;
+        const otherBoxes = Array.from(document.querySelectorAll('.signature-box')).filter(other =>
+            other !== box &&
+            other.dataset.fileIndex === box.dataset.fileIndex &&
+            other.dataset.page === box.dataset.page
+        );
+        let top = Math.max(10, Math.min(yPx, canvasRect.height - box.offsetHeight - 10));
+
+        const nearbyBox = otherBoxes.find(other =>
+            Math.abs(other.getBoundingClientRect().top - (canvasRect.top + yPx)) <= 32
+        );
+        if (nearbyBox) {
+            top = nearbyBox.getBoundingClientRect().top - canvasRect.top;
+        }
+
+        let left = Math.max(10, Math.min(xPx, canvasRect.width - box.offsetWidth - 10));
+        top = Math.max(10, Math.min(top, canvasRect.height - box.offsetHeight - 10));
+
+        for (let attempt = 0; attempt <= otherBoxes.length; attempt++) {
+            positionSignatureBoxAtCanvas(box, left, top);
+            const boxRect = box.getBoundingClientRect();
+            const collision = otherBoxes.find(other => {
+                const otherRect = other.getBoundingClientRect();
+                return boxRect.left < otherRect.right + gap &&
+                    boxRect.right + gap > otherRect.left &&
+                    boxRect.top < otherRect.bottom + gap &&
+                    boxRect.bottom + gap > otherRect.top;
+            });
+
+            if (!collision) break;
+
+            const collisionRect = collision.getBoundingClientRect();
+            const nextLeft = collisionRect.right - canvasRect.left + gap;
+            if (nextLeft + box.offsetWidth <= canvasRect.width - 10) {
+                left = nextLeft;
+            } else {
+                left = 10;
+                top = collisionRect.bottom - canvasRect.top + gap;
+            }
+
+            left = Math.max(10, Math.min(left, canvasRect.width - box.offsetWidth - 10));
+            top = Math.max(10, Math.min(top, canvasRect.height - box.offsetHeight - 10));
+        }
+
+        const finalLeft = parseFloat(box.style.left) - canvasOffsetX;
+        const finalTop = parseFloat(box.style.top) - canvasOffsetY;
+        const xPercent = parseFloat((finalLeft / canvasRect.width).toFixed(4));
+        const yPercent = parseFloat((finalTop / canvasRect.height).toFixed(4));
+        box.dataset.x = xPercent;
+        box.dataset.y = yPercent;
+
+        const file = uploadedFiles[parseInt(box.dataset.fileIndex || activeFileIndex)];
+        if (file) {
+            file.signatures = file.signatures.map(signature => {
+                if (signature.signer_id == box.dataset.signerId && signature.page === parseInt(box.dataset.page)) {
+                    return { ...signature, x_percent: xPercent, y_percent: yPercent };
+                }
+                return signature;
+            });
+        }
     }
 
     function makeSignatureBoxDraggable(box) {
@@ -644,6 +696,15 @@ function renderSignerListFromStep2() {
     box.addEventListener('pointerup', () => {
         isDragging = false;
         box.style.cursor = 'move';
+        const canvasRect = pdfCanvas.getBoundingClientRect();
+        const areaRect = pdfArea.getBoundingClientRect();
+        const canvasOffsetX = canvasRect.left - areaRect.left + pdfArea.scrollLeft;
+        const canvasOffsetY = canvasRect.top - areaRect.top + pdfArea.scrollTop;
+        ensureSignatureBoxDoesNotOverlap(
+            box,
+            parseFloat(box.style.left) - canvasOffsetX,
+            parseFloat(box.style.top) - canvasOffsetY
+        );
     });
 }
     // ================= NEXT BUTTON HANDLER - FULL VERSION =================
@@ -1194,7 +1255,7 @@ function renderRequesterSection() {
         
         let options = '<option value="">-- Select Approver --</option>';
         usersList.forEach(user => {
-            options += `<option value="${user.id}" data-division="${user.division_id || divisionId}">
+            options += `<option value="${user.id}" data-name="${user.name}" data-division="${user.division_id || divisionId}">
                 ${user.name} - ${user.role_name || 'User'}${divisionName ? ` (${divisionName})` : ''}
             </option>`;
         });
@@ -1433,10 +1494,8 @@ function renderRequesterSection() {
         const xPx = xPercent * canvasRect.width;
         const yPx = yPercent * canvasRect.height;
 
-        box.style.position = 'absolute';
-        box.style.left = `${xPx}px`;
-        box.style.top = `${yPx}px`;
-        box.style.zIndex = 100;
+        positionSignatureBoxAtCanvas(box, xPx, yPx);
+        ensureSignatureBoxDoesNotOverlap(box, xPx, yPx);
     }
     // ================= PDF UPLOAD - DRAG & DROP + CLICK AREA =================
     const uploadArea = document.getElementById('uploadArea');
@@ -1649,9 +1708,9 @@ function renderRequesterSection() {
             <span class="approver-name">${sig.signer_name}</span>
         </div>
     `;
-                positionSignatureBox(box);
                 makeSignatureBoxDraggable(box);
                 pdfArea.appendChild(box);
+                positionSignatureBox(box);
             });
             
             updateSignerUIForCurrentFile();
@@ -1877,7 +1936,7 @@ function collectStep2Data() {
             if (approverId) {
                 tierApprovers.push({
                     user_id: approverId,
-                    name: selectedOption.text().trim() || 'Unknown',
+                    name: selectedOption.data('name') || 'Unknown',
                     division_id: selectedOption.data('division') || $(this).data('division') || '',
                     show_on_document: showOnDoc.is(':checked'),
                     is_requester: false,
@@ -2539,22 +2598,19 @@ function loadFoldersAndDocTypes(orgId) {
         display: inline-block;
 
         font-family: Arial, sans-serif;
-        font-size: 11px;
+        font-size: 16.5px;
         font-weight: 700;
     }
 
     .signature-box .signature-text {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        flex-wrap: nowrap;
+        display: inline;
     }
 
     .signature-box .approved-by,
     .signature-box .at,
     .signature-box .approver-name,
     .signature-box .datetime {
-        font-size: 11px;
+        font-size: 16.5px;
         font-weight: 700;
         font-family: Arial, sans-serif;
     }
@@ -2574,23 +2630,6 @@ function loadFoldersAndDocTypes(orgId) {
         text-align: center;
         cursor: pointer;
         border: 2px solid white;
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-        .signature-box {
-            min-width: 220px;
-            padding: 4px 10px;
-            font-size: 10px;
-        }
-        
-        .signature-text .approver-name {
-            font-size: 10px;
-        }
-        
-        .signature-text .datetime {
-            font-size: 9px;
-        }
     }
 
     /* Signer Item Panel */

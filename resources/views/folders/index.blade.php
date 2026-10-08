@@ -8,25 +8,31 @@
 
     <h1 class="h4 mb-4 text-gray-800">Folder</h1>
 
-    <div class="card shadow mb-4">
-        <div class="card-body">
+    @foreach($organizations as $organization)
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="font-weight-bold text-primary mb-0">
+                        Folder Tree <span class="text-danger">{{ $organization->organization_name }}</span>
+                    </h6>
 
-            <!-- HEADER -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="font-weight-bold text-primary">Folder Tree</h6>
+                    <button class="btn btn-primary btn-sm addFolderForOrganization"
+                        data-organization-id="{{ $organization->id }}"
+                        data-toggle="modal"
+                        data-target="#addModal">
+                        + Add Folder
+                    </button>
+                </div>
 
-                <button class="btn btn-primary btn-sm"
-                    data-toggle="modal"
-                    data-target="#addModal">
-                    + Add Folder
-                </button>
+                @php($organizationFolders = $rootFolders->where('organization_id', $organization->id))
+                @if($organizationFolders->isNotEmpty())
+                    @include('folders._tree', ['folders' => $organizationFolders])
+                @else
+                    <p class="text-muted mb-0">No folders yet.</p>
+                @endif
             </div>
-
-            <!-- TREE -->
-            @include('folders._tree', ['folders' => $rootFolders])
-
         </div>
-    </div>
+    @endforeach
 </div>
 
 <!-- MODAL -->
@@ -133,6 +139,10 @@ function buildOptions(folders, parentId = null, path = '') {
         let filtered = folders.filter(f => f.organization_id == orgId);
 
         parentSelect.innerHTML += buildOptions(filtered);
+    });
+
+    $('.addFolderForOrganization').on('click', function() {
+        $('#orgSelect').val($(this).data('organization-id')).trigger('change');
     });
 
 

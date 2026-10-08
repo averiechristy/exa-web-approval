@@ -218,7 +218,7 @@
                                     name="steps[0][division_id]">
                                 <option value="">Select Division</option>
                                 @foreach($divisions as $div)
-                                    <option value="{{ $div->id }}">
+                                    <option value="{{ $div->id }}" data-organization-id="{{ $div->organization_id }}">
                                         {{ $div->division_name }}
                                     </option>
                                 @endforeach
@@ -353,7 +353,32 @@
 @push('scripts')
 <script>
 let originalEditData = null;
-$(document).ready(function () { 
+function filterWorkflowDivisions(container, organizationId) {
+    $(`${container} select[name*="[division_id]"]`).each(function () {
+        const select = $(this);
+        const selectedOption = select.find('option:selected');
+
+        select.find('option').each(function () {
+            const option = $(this);
+            const belongsToOrganization = option.val() === '' || option.data('organization-id') == organizationId;
+            option.prop('disabled', !belongsToOrganization).toggle(belongsToOrganization);
+        });
+
+        if (selectedOption.val() && selectedOption.data('organization-id') != organizationId) {
+            select.val('');
+        }
+    });
+}
+
+$(document).ready(function () {
+    $('#organizationId').on('change', function () {
+        filterWorkflowDivisions('#workflowContainer', $(this).val());
+    });
+
+    $('#editOrganizationId').on('change', function () {
+        filterWorkflowDivisions('#editWorkflowContainer', $(this).val());
+    });
+
     $('#clearWorkflow').on('click', function () {
         resetWorkflowForm();
     });
@@ -532,6 +557,7 @@ $(document).on('click', '.edit-btn', function () {
                                 name="steps[${index}][division_id]">
                                 @foreach($divisions as $div)
                                     <option value="{{ $div->id }}"
+                                        data-organization-id="{{ $div->organization_id }}"
                                         ${step.division_id == {{ $div->id }} ? 'selected' : ''}>
                                         {{ $div->division_name }}
                                     </option>
@@ -573,6 +599,8 @@ $(document).on('click', '.edit-btn', function () {
                 $("#editWorkflowContainer").append(row);
             });
 
+            filterWorkflowDivisions('#editWorkflowContainer', res.organization_id);
+
             $('#editWorkflowModal').modal('show');
         }
     });
@@ -596,7 +624,7 @@ $(document).on('click', '#editAddWorkflowRow', function () {
                 <select class="form-control" name="steps[${index}][division_id]">
                     <option value="">Select Division</option>
                     @foreach($divisions as $div)
-                        <option value="{{ $div->id }}">{{ $div->division_name }}</option>
+                        <option value="{{ $div->id }}" data-organization-id="{{ $div->organization_id }}">{{ $div->division_name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -686,6 +714,7 @@ function renderEditSteps(steps) {
                         name="steps[${index}][division_id]">
                         @foreach($divisions as $div)
                             <option value="{{ $div->id }}"
+                                data-organization-id="{{ $div->organization_id }}"
                                 ${step.division_id == {{ $div->id }} ? 'selected' : ''}>
                                 {{ $div->division_name }}
                             </option>
@@ -726,6 +755,8 @@ function renderEditSteps(steps) {
 
         $("#editWorkflowContainer").append(row);
     });
+
+    filterWorkflowDivisions('#editWorkflowContainer', $('#editOrganizationId').val());
 }
 
 $(document).on('click', '#editClearWorkflow', function () {

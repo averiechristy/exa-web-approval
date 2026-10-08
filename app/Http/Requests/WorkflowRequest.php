@@ -40,7 +40,21 @@ class WorkflowRequest extends FormRequest
             'steps' => ['required', 'array', 'min:1'],
 
             'steps.*.tier' => ['required', 'integer', 'min:1'],
-            'steps.*.division_id' => ['required', 'integer', 'exists:divisions,id'],
+            'steps.*.division_id' => [
+                'required',
+                'integer',
+                function ($attribute, $value, $fail) {
+                    $belongsToOrganization = DB::table('divisions')
+                        ->where('id', $value)
+                        ->where('organization_id', $this->input('organization_id'))
+                        ->whereNull('deleted_at')
+                        ->exists();
+
+                    if (!$belongsToOrganization) {
+                        $fail('The selected division must belong to the workflow organization.');
+                    }
+                },
+            ],
             'steps.*.sla_days' => ['required', 'integer', 'min:1'],
             'steps.*.min_role_level' => ['required'],
         ];
@@ -58,6 +72,7 @@ class WorkflowRequest extends FormRequest
 
             'steps.*.division_id.required' => 'Division is required',
             'steps.*.division_id.exists' => 'Invalid division selected',
+            'steps.*.division_id.*' => 'The selected division must belong to the workflow organization.',
         ];
     }
 

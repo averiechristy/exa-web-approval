@@ -16,6 +16,7 @@ class SlaDashboardController extends Controller
     public function index(Request $request)
     {
         $activeOrgId = session('active_organization_id');
+        $activeDivisionId = session('active_division_id');
         $authUserId = auth()->id();
         $viewMode = strtoupper($request->input('view', 'INBOX'));
         $viewMode = in_array($viewMode, ['SENT', 'INBOX'], true) ? $viewMode : 'INBOX';
@@ -107,20 +108,19 @@ class SlaDashboardController extends Controller
             : $authUserId;
 
         if ($viewMode === 'SENT') {
-            $query->whereHas('document', function ($q) use ($targetUserId) {
-                $q->where('requester_id', $targetUserId);
+            $query->whereHas('document', function ($q) use ($targetUserId, $activeDivisionId) {
+                $q->where('requester_id', $targetUserId)
+                    ->when($activeDivisionId, fn ($divisionQuery) => $divisionQuery->where('requester_division_id', $activeDivisionId));
             });
         } else {
             $query->where('approver_id', $targetUserId)
+                ->when($activeDivisionId, fn ($divisionQuery) => $divisionQuery->where('document_approvals.division_id', $activeDivisionId))
                 ->whereHas('document', function ($q) use ($targetUserId) {
                     $q->where('requester_id', '!=', $targetUserId);
                 });
         }
 
         // === FILTERS DARI INPUT USER ===
-        if ($request->filled('division_id')) {
-            $query->where('division_id', $request->division_id);
-        }
         if ($request->filled('status')) {
             $query->whereHas('document', function ($q) use ($request) {
                 $q->where('status', $request->status);
